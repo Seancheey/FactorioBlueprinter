@@ -1,7 +1,8 @@
+require("helper")
 main_button = "bp-main-button"
 main_frame = "bp-outputs-frame"
+unit_values = {["item/s"] = 1, ["item/min"] = 60}
 output_units = {"item/s", "item/min"}
-require("helper")
 -- clear all mod guis
 function clear_mod_gui(player)
     for i, to_remove in ipairs{main_button,main_frame} do
@@ -61,7 +62,13 @@ function create_new_output_item_choice(parent, player_index)
     local unitbox = parent.add{type = "drop-down", items = output_units, selected_index = 1}
     register_gui_event_handler(unitbox, defines.events.on_gui_selection_state_changed,
         function(e)
+            local old_unit_val = unit_values[item_choice.unit]
             item_choice.unit = output_units[e.element.selected_index]
+            local new_unit_val = unit_values[item_choice.unit]
+            -- recalculate item crafting speed according to new unit
+            local new_num = item_choice.num*new_unit_val/old_unit_val
+            numfield.text = tostring(new_num)
+            item_choice.num = new_num
             debug_print('unit to ' .. item_choice.unit, e.player_index)
         end
     )
