@@ -17,6 +17,8 @@ script.on_event(defines.events.on_player_joined_game,
         local button = create_blueprinter_button(player.gui.left)
         local frame = create_outputs_frame(player.gui.left, e.player_index)
         frame.visible = false
+        local in_frame =  create_inputs_frame(player.gui.left, e.player_index)
+        in_frame.visible = false
     end
 )
 -- script.on_event(defines.events.on_gui_elem_changed,

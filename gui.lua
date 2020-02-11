@@ -1,8 +1,10 @@
 require("helper")
 main_button = "bp-main-button"
 main_frame = "bp-outputs-frame"
+inputs_frame = "bp-inputs-frame"
 unit_values = {["item/s"] = 1, ["item/min"] = 60}
 output_units = {"item/s", "item/min"}
+
 -- clear all mod guis
 function clear_mod_gui(player)
     for i, to_remove in ipairs{main_button,main_frame} do
@@ -24,11 +26,12 @@ function create_blueprinter_button(parent)
     }
     register_gui_event_handler(button, defines.events.on_gui_click,
         function(e)
-            local player = game.players[e.player_index]
-            player.gui.left[main_frame].visible = not player.gui.left[main_frame].visible
+            e.gui.left[main_frame].visible = not e.gui.left[main_frame].visible
+            e.gui.left[inputs_frame].visible = false
         end
     )
 end
+
 
 function create_new_output_item_choice(parent, player_index)
     local outputs_table = global.blueprint_outputs[player_index]
@@ -82,10 +85,26 @@ function create_outputs_frame(parent, player_index)
                 local output_table = output_flow.add{type = "table", name = "output_table", caption = "select output items",column_count = 3}
                     create_new_output_item_choice(output_table, player_index)
                 local confirm_button = output_flow.add{type = "button", caption = "confirm"}
+                register_gui_event_handler(confirm_button, defines.events.on_gui_click,
+                    function(e)
+                        e.gui.left[inputs_frame].visible = true
+                    end
+                )
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
                 local test = tab_pane.add{type = "label",name = "test",caption = "test setting"}
             tab_pane.add_tab(output_tab, output_flow)
             tab_pane.add_tab(setting_tab, test)
             tab_pane.selected_tab_index = 1
+    return frame
+end
+
+function create_inputs_frame(parent, player_index)
+    local frame = parent.add{name = inputs_frame, type= "frame", caption = "Input Source Select"}
+        local inputs_flow = frame.add{type = "flow", direction = "vertical"}
+            local inputs_table = inputs_flow.add{type = "table", column_count = 3}
+                -- TODO add input recipes
+            local confirm_button = inputs_flow.add{type = "button", caption = "confirm"}
+        local outputs_view_flow = frame.add{type = "flow", direction = "vertical", caption = "target outputs"}
+            -- TODO add output recipes
     return frame
 end
