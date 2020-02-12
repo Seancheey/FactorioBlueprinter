@@ -8,6 +8,7 @@ function register_gui_event_handler(gui_elem, event, handler)
                     if e.element == elem then
                         e.gui = game.players[e.player_index].gui
                         handle(e)
+                        break
                     end
                 end
             end
@@ -16,9 +17,14 @@ function register_gui_event_handler(gui_elem, event, handler)
     global.handlers[event][gui_elem] = handler
 end
 
+function unregister_gui_event_handler(gui_elem, event)
+    global.handlers[event][gui_elem] = nil
+end
+
 function debug_print(msg, player_index)
+    local player = player_index and game.players[player_index] or game
     if true then
-        game.players[player_index].print(tostring(msg))
+        player.print(tostring(msg))
     end
 end
 
@@ -28,6 +34,14 @@ function key_string(table)
         keys = keys .. " " .. tostring(k)
     end
     return keys
+end
+
+function array_string(array)
+    local out = ""
+    for i,val in ipairs(array) do
+        out = out .. " " .. tostring(val)
+    end
+    return out
 end
 
 function sprite_of(name)

@@ -94,10 +94,53 @@ function create_outputs_frame(parent, player_index)
     return frame
 end
 
-function create_input_choose_buttons(parent, recipe_name)
-    parent.add{type="sprite-button", sprite="utility/left_arrow"}
-    parent.add{type="sprite", sprite=sprite_of(recipe_name)}
-    parent.add{type="sprite-button", sprite="utility/right_arrow"}
+function create_input_buttons(gui_parent, graph)
+    for ingredient_name, node in pairs(graph.inputs) do
+        local left_button = gui_parent.add{type="sprite-button", sprite="utility/left_arrow", tooltip="use it's ingredient instead"}
+        local ingredient_sprite = gui_parent.add{type="sprite", sprite=sprite_of(ingredient_name)}
+        local right_button = gui_parent.add{type="sprite-button", sprite="utility/right_arrow", tooltip = "use it's products instead"}
+        register_gui_event_handler(left_button, defines.events.on_gui_click,
+            function (e)
+                if next(node.children) ~= nil then
+                    for child_name, child_node in pairs(node.children) do
+                        graph.inputs[child_name] = child_node
+                    end
+                    graph.inputs[ingredient_name] = nil
+                    gui_parent.clear()
+                    create_input_buttons(gui_parent, graph)
+                else
+                    debug_print("most basic ingredient doesn't allow break down")
+                end
+            end
+        )
+        register_gui_event_handler(right_button, defines.events.on_gui_click,
+            function (e)
+                for parent_name, parent_node in pairs(node.parents) do
+                    for output_name, output_node in pairs(graph.outputs) do
+                        if parent_node.name == output_name then
+                            debug_print("ingredient can't be more advanced")
+                            return
+                        end
+                    end
+                end
+
+                graph.inputs[ingredient_name] = nil
+                for parent_name, parent_node in pairs(node.parents) do
+                    for input_name, input_node in pairs(graph.inputs) do
+                        if parent_node:is_sole_product_of(input_node) then
+                            graph.inputs[input_name] = nil
+                        end
+                    end
+                end
+                for parent_name, parent_node in pairs(node.parents) do
+                    graph.inputs[parent_name] = parent_node
+                end
+                debug_print("new_inputs:"..key_string(graph.inputs))
+                gui_parent.clear()
+                create_input_buttons(gui_parent, graph)
+            end
+        )
+    end
 end
 
 function create_inputs_frame(parent, player_index)
@@ -111,18 +154,17 @@ function create_inputs_frame(parent, player_index)
         local confirm_button = frame.add{type = "button", caption = "confirm"}
     register_gui_event_handler(frame, defines.events.on_gui_opened,
         function(e)
-            inputs_table.clear()
-            outputs_view_flow.clear()
-            --debug_print(key_string(global.blueprint_outputs), e.player_index)
             local graph = generate_dependency_graph(e.player_index)
 
+            -- update outputs view
+            outputs_view_flow.clear()
             for k, v in pairs(graph.outputs) do
                 outputs_view_flow.add{type="sprite", sprite=sprite_of(k)}
             end
-            
-            for k, v in pairs(graph.inputs) do
-                create_input_choose_buttons(inputs_table, k)
-            end
+
+            -- update inputs view
+            inputs_table.clear()
+            create_input_buttons(inputs_table, graph)
         end
     )
     return frame

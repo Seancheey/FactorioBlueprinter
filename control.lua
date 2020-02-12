@@ -21,12 +21,3 @@ script.on_event(defines.events.on_player_joined_game,
         in_frame.visible = false
     end
 )
--- script.on_event(defines.events.on_gui_elem_changed,
---     function(e)
---         local player = game.players[e.player_index]
---         if e.element.type == "choose-elem-button" then
---             player.print(e.element.elem_type .. ", " .. e.element.elem_value)
---         end
---     end
--- )
---script.on_event(defines.events.on_player_respawned,create_mod_gui)
