@@ -21,3 +21,11 @@ function debug_print(msg, player_index)
         game.players[player_index].print(tostring(msg))
     end
 end
+
+function key_string(table)
+    local keys = ""
+    for k,v in pairs(table) do
+        keys = keys .. " " .. tostring(k)
+    end
+    return keys
+end
