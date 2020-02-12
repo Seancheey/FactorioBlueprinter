@@ -29,3 +29,11 @@ function key_string(table)
     end
     return keys
 end
+
+function sprite_of(name)
+    if game.item_prototypes[name] then
+        return "item/"..name
+    elseif game.fluid_prototypes[name] then
+        return "fluid/"..name
+    end
+end

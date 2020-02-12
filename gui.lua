@@ -94,24 +94,34 @@ function create_outputs_frame(parent, player_index)
     return frame
 end
 
+function create_input_choose_buttons(parent, recipe_name)
+    parent.add{type="sprite-button", sprite="utility/left_arrow"}
+    parent.add{type="sprite", sprite=sprite_of(recipe_name)}
+    parent.add{type="sprite-button", sprite="utility/right_arrow"}
+end
+
 function create_inputs_frame(parent, player_index)
-    local frame = parent.add{name = inputs_frame, type= "frame", caption = "Input Source Select"}
-        local inputs_flow = frame.add{type = "flow", direction = "vertical"}
-            local inputs_table = inputs_flow.add{type = "table", column_count = 3}
-                -- TODO add input recipes
-            local confirm_button = inputs_flow.add{type = "button", caption = "confirm"}
-        local outputs_view_flow = frame.add{type = "flow", direction = "vertical", caption = "target outputs"}
-            -- TODO add output recipes
+    local frame = parent.add{name = inputs_frame, type= "frame", caption = "Input Source Select", direction = "vertical"}
+        local hori_flow = frame.add{type = "table", column_count = 2}
+            local input_select_frame = hori_flow.add{type = "frame", caption = "Input Items Select"}
+                local inputs_flow = input_select_frame.add{type = "flow", direction = "vertical"}
+                    local inputs_table = inputs_flow.add{type = "table", column_count = 3}
+            local outputs_frame = hori_flow.add{type = "frame", caption = "Final Products"}
+                local outputs_view_flow = outputs_frame.add{type = "flow", direction = "vertical", caption = "target outputs"}
+        local confirm_button = frame.add{type = "button", caption = "confirm"}
     register_gui_event_handler(frame, defines.events.on_gui_opened,
         function(e)
-            inputs_flow.clear()
+            inputs_table.clear()
             outputs_view_flow.clear()
             --debug_print(key_string(global.blueprint_outputs), e.player_index)
             local graph = generate_dependency_graph(e.player_index)
-            debug_print("outputs:" .. key_string(graph.outputs), e.player_index)
-            debug_print("inputs:" .. key_string(graph.inputs), e.player_index)
+
             for k, v in pairs(graph.outputs) do
-                outputs_view_flow.add{type="sprite", sprite="item/"..k}
+                outputs_view_flow.add{type="sprite", sprite=sprite_of(k)}
+            end
+            
+            for k, v in pairs(graph.inputs) do
+                create_input_choose_buttons(inputs_table, k)
             end
         end
     )
