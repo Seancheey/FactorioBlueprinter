@@ -20,11 +20,11 @@ end
 function IngredientNode:is_sole_product_of(other)
     if self == other then
         return true
-    elseif #other.parents == 0 then
+    elseif next(other.parents) == nil then
         return false
     else
-        for i, parent in ipairs(other.parents) do
-            if not self.is_sole_product_of(parent) then
+        for parent_name, parent in pairs(other.parents) do
+            if not self:is_sole_product_of(parent) then
                 return false
             end
         end
