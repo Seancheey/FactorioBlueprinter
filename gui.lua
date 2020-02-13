@@ -126,14 +126,20 @@ function create_input_buttons(gui_parent, graph)
                         end
                     end
                 end
-                for parent_name, parent_node in pairs(graph.inputs) do
+                local to_add = {}
+                for parent_name, parent_node in pairs(node.parents) do
+                    can_add = true
                     for input_name, input_node in pairs(graph.inputs) do
-                        if parent_name ~= input_name and parent_node:is_sole_product_of(input_node) then
-                            graph.inputs[input_name] = nil
+                        if input_node:is_sole_product_of(parent_node) then
+                            can_add = false
+                            break
                         end
                     end
+                    if can_add then
+                        to_add[parent_name] = parent_node
+                    end
                 end
-                for parent_name, parent_node in pairs(node.parents) do
+                for parent_name, parent_node in pairs(to_add) do
                     graph.inputs[parent_name] = parent_node
                 end
                 gui_parent.clear()
