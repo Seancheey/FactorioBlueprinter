@@ -35,6 +35,20 @@ function IngredientNode:is_sole_product_of(other)
     end
 end
 
+function IngredientNode:produce_only(nodes)
+    assert(self and nodes)
+    if nodes:has(self) then
+        return true
+    end
+    if next(self.parents) == nil then
+        return false
+    end
+    if self.parents:values():all(function (node) return node:produce_only(nodes) end) then
+        return true
+    end
+    return false
+end
+
 function generate_dependency_graph(player_index)
     dependency = newtable{dict = newtable{}, outputs = newtable{}, inputs = newtable{}}
     for k, item_choice in pairs(global.blueprint_outputs[player_index]) do

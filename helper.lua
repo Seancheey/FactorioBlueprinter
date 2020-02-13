@@ -48,6 +48,17 @@ function Table:keys()
     return keyset
 end
 
+function Table:values()
+    assert(self)
+    local valset = newtable()
+    local n=0
+    for _, v in pairs(self) do
+      n=n+1
+      valset[n]=v
+    end
+    return valset
+end
+
 function Table:has(val)
     assert(self and val)
     for _, test in pairs(self) do
@@ -97,6 +108,14 @@ function Table:tostring()
     end
     keys = keys .. "}"
     return keys
+end
+
+function Table:shallow_copy()
+    out = newtable{}
+    for k,v in pairs(self) do
+        out[k] = v
+    end
+    return out
 end
 
 function sprite_of(name)

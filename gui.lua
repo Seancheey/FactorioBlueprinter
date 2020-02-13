@@ -118,33 +118,28 @@ function create_input_buttons(gui_parent, graph)
                     end
                 end
 
-                graph.inputs[ingredient_name] = nil
+                graph.inputs[node.name] = nil
                 for parent_name, parent_node in pairs(node.parents) do
-                    for input_name, input_node in pairs(graph.inputs) do
-                        if parent_node:is_sole_product_of(input_node) then
-                            graph.inputs[input_name] = nil
-                        end
-                    end
-                end
-                local to_add = {}
-                for parent_name, parent_node in pairs(node.parents) do
-                    can_add = true
-                    for input_name, input_node in pairs(graph.inputs) do
-                        if input_node:is_sole_product_of(parent_node) then
-                            can_add = false
-                            break
-                        end
-                    end
-                    if can_add then
-                        to_add[parent_name] = parent_node
-                    end
-                end
-                for parent_name, parent_node in pairs(to_add) do
                     graph.inputs[parent_name] = parent_node
                 end
+
+                -- remove unecessary input sources that are fully covered by other ingredients
+                local others = graph.inputs:shallow_copy()
+                local to_remove = {}
+                for input_name, input_node in pairs(graph.inputs) do
+                    others[input_name] = nil
+                    if input_node:produce_only(others:values()) then
+                        to_remove[#to_remove+1] = input_node
+                    end
+                    others[input_name] = input_node
+                end
+                for i, node in ipairs(to_remove) do
+                    graph.inputs[node.name] = nil
+                end
+
+                --update gui
                 gui_parent.clear()
                 create_input_buttons(gui_parent, graph)
-                debug_print(graph.inputs:keys():tostring())
             end
         )
     end
