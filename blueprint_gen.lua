@@ -1,10 +1,13 @@
 require("helper")
-IngredientNode = {name = "", item_per_sec = 0, parents= {}, children = {}}
-IngredientNode.__index = IngredientNode
+IngredientNode = {name = "", item_per_sec = 0, parents= newtable{}, children = newtable{}}
+-- IngredientNode class inherents Table class
+function IngredientNode.__index (t,k)
+    return IngredientNode[k] or Table[k]
+end
 
 function IngredientNode:new(o)
-    o.parents = o.parents or {}
-    o.children = o.children or {}
+    o.parents = o.parents or newtable{}
+    o.children = o.children or newtable{}
     setmetatable(o,self)
     return o
 end
@@ -32,8 +35,27 @@ function IngredientNode:is_sole_product_of(other)
     end
 end
 
+function IngredientNode:is_unnecessary_input_in_inputs(graph)
+    local output_names = graph.outputs:keys()
+    local input_names = graph.inputs:keys()
+
+    if next(self.parents) == nil then
+        return false
+    end
+    for parent_name, parent_node in pairs(self.parents) do
+        if output_names:has(parent_name) then
+            return false
+        end
+
+        if not parent_node:is_unnecessary_input_in_inputs(graph) then
+            return false
+        end
+    end
+    return true
+end
+
 function generate_dependency_graph(player_index)
-    dependency = {dict = {}, outputs = {}, inputs = {}}
+    dependency = newtable{dict = newtable{}, outputs = newtable{}, inputs = newtable{}}
     for k, item_choice in pairs(global.blueprint_outputs[player_index]) do
         if item_choice.recipe then
             generate_dependency_helper(item_choice.recipe, item_choice.crafting_speed, dependency, true)
@@ -55,7 +77,6 @@ function generate_dependency_helper(ingredient_name, crafting_speed, dependency_
     if recipe then
         for i,ingredient in ipairs(recipe.ingredients) do
             local child = generate_dependency_helper(ingredient.name, crafting_speed*ingredient.amount, dependency_graph)
-            debug_print(child.name)
             node:add_child(child)
             child:add_parent(node)
         end

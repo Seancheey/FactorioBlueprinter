@@ -115,12 +115,10 @@ function create_input_buttons(gui_parent, graph)
         )
         register_gui_event_handler(right_button, defines.events.on_gui_click,
             function (e)
-                for parent_name, parent_node in pairs(node.parents) do
-                    for output_name, output_node in pairs(graph.outputs) do
-                        if parent_node.name == output_name then
-                            debug_print("ingredient can't be more advanced")
-                            return
-                        end
+                for parent_name, _ in pairs(node.parents) do
+                    if graph.outputs:keys():has(parent_name) then
+                        debug_print("ingredient can't be more advanced")
+                        return
                     end
                 end
 
@@ -132,10 +130,16 @@ function create_input_buttons(gui_parent, graph)
                         end
                     end
                 end
+                for parent_name, parent_node in pairs(graph.inputs) do
+                    for input_name, input_node in pairs(graph.inputs) do
+                        if parent_name ~= input_name and parent_node:is_sole_product_of(input_node) then
+                            graph.inputs[input_name] = nil
+                        end
+                    end
+                end
                 for parent_name, parent_node in pairs(node.parents) do
                     graph.inputs[parent_name] = parent_node
                 end
-                debug_print("new_inputs:"..key_string(graph.inputs))
                 gui_parent.clear()
                 create_input_buttons(gui_parent, graph)
             end

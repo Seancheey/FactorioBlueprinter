@@ -28,20 +28,52 @@ function debug_print(msg, player_index)
     end
 end
 
-function key_string(table)
-    local keys = ""
-    for k,v in pairs(table) do
-        keys = keys .. " " .. tostring(k)
-    end
-    return keys
+Table = {}
+Table.__index = Table
+
+function newtable(table)
+    out = table or {}
+    setmetatable(out,Table)
+    return out
 end
 
-function array_string(array)
-    local out = ""
-    for i,val in ipairs(array) do
-        out = out .. " " .. tostring(val)
+function Table:keys()
+    assert(self)
+    local keyset = newtable()
+    local n=0
+    for k, _ in pairs(self) do
+      n=n+1
+      keyset[n]=k
+    end
+    return keyset
+end
+
+function Table:has(val)
+    assert(self and val)
+    for _, test in pairs(self) do
+        if val == test then
+            return true
+        end
+    end
+    return false
+end
+
+function Table:map(f)
+    assert(self and f)
+    out = {}
+    for k, v in pairs(self) do
+        out[k] = f(v)
     end
     return out
+end
+
+function Table:tostring()
+    local keys = "{"
+    for k,v in pairs(self) do
+        keys = keys .. tostring(k) .. ": " .. tostring(v) .. ","
+    end
+    keys = keys .. "}"
+    return keys
 end
 
 function sprite_of(name)
