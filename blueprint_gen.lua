@@ -26,32 +26,13 @@ function IngredientNode:is_sole_product_of(other)
     elseif next(other.parents) == nil then
         return false
     else
-        for parent_name, parent in pairs(other.parents) do
+        for _, parent in pairs(other.parents) do
             if not self:is_sole_product_of(parent) then
                 return false
             end
         end
         return true
     end
-end
-
-function IngredientNode:is_unnecessary_input_in_inputs(graph)
-    local output_names = graph.outputs:keys()
-    local input_names = graph.inputs:keys()
-
-    if next(self.parents) == nil then
-        return false
-    end
-    for parent_name, parent_node in pairs(self.parents) do
-        if output_names:has(parent_name) then
-            return false
-        end
-
-        if not parent_node:is_unnecessary_input_in_inputs(graph) then
-            return false
-        end
-    end
-    return true
 end
 
 function generate_dependency_graph(player_index)

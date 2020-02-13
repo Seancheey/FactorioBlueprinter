@@ -1,10 +1,11 @@
 require("gui")
+
 function try_init_all_global()
-    if not global.handlers then global.handlers = {} end
-    if not global.blueprint_outputs then global.blueprint_outputs = {} end
+    if not global.handlers then global.handlers = newtable{} end
+    if not global.blueprint_outputs then global.blueprint_outputs = newtable{} end
 end
 function init_player_global(player_index)
-    global.blueprint_outputs[player_index] = {}
+    global.blueprint_outputs[player_index] = newtable{}
 end
 --initialize blueprinter guis
 script.on_event(defines.events.on_player_joined_game,

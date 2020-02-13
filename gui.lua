@@ -40,17 +40,12 @@ function create_new_output_item_choice(parent, player_index)
         function(e)
             item_choice.recipe = e.element.elem_value
             debug_print('recipe to ' .. tostring(item_choice.recipe), e.player_index)
-            -- expand table if in need
-            local need_expand = true
-            for i, choice in ipairs(outputs_table) do
-                if not choice.recipe then
-                    need_expand = false
-                    break
-                end
-            end
-            if need_expand then
+            -- expand table if full
+            if outputs_table:all(function(x) return x.recipe end) then
                 create_new_output_item_choice(parent, player_index)
             end
+            -- any change to output makes next frame invisible
+            e.gui.left[inputs_frame].visible = false
         end
     )
     local numfield = parent.add{type = "textfield", text = "1", numeric = true, allow_negative = false}
@@ -108,6 +103,7 @@ function create_input_buttons(gui_parent, graph)
                     graph.inputs[ingredient_name] = nil
                     gui_parent.clear()
                     create_input_buttons(gui_parent, graph)
+                    debug_print(graph.inputs:keys():tostring())
                 else
                     debug_print("most basic ingredient doesn't allow break down")
                 end
@@ -142,6 +138,7 @@ function create_input_buttons(gui_parent, graph)
                 end
                 gui_parent.clear()
                 create_input_buttons(gui_parent, graph)
+                debug_print(graph.inputs:keys():tostring())
             end
         )
     end

@@ -67,6 +67,29 @@ function Table:map(f)
     return out
 end
 
+function Table:all(f)
+    f = f or function(x) return x end
+    assert(self and f)
+    for _, v in pairs(self) do
+        if not f(v) then
+            return false
+        end
+    end
+    return true
+end
+
+function Table:any(f)
+    f = f or function(x) return x end
+    assert(self and f)
+    for _, v in pairs(self) do
+        if f(v) then
+            return true
+        end
+    end
+    return false
+end
+
+
 function Table:tostring()
     local keys = "{"
     for k,v in pairs(self) do
