@@ -8,7 +8,7 @@ output_units = {"item/s", "item/min"}
 
 -- clear all mod guis
 function clear_mod_gui(player)
-    for i, to_remove in ipairs{main_button,main_frame,inputs_frame} do
+    for _, to_remove in ipairs{main_button,main_frame,inputs_frame} do
         if player.gui.left[to_remove] then
             player.gui.left[to_remove].destroy()
         end
@@ -38,10 +38,10 @@ function create_new_output_item_choice(parent, player_index)
     local choose_button = parent.add{type = "choose-elem-button", elem_type = "recipe"}
     register_gui_event_handler(choose_button, defines.events.on_gui_elem_changed,
         function(e)
-            item_choice.recipe = e.element.elem_value
-            debug_print('recipe to ' .. tostring(item_choice.recipe), e.player_index)
+            item_choice.ingredient = e.element.elem_value
+            debug_print('recipe to ' .. tostring(item_choice.ingredient), e.player_index)
             -- expand table if full
-            if outputs_table:all(function(x) return x.recipe end) then
+            if outputs_table:all(function(x) return x.ingredient end) then
                 create_new_output_item_choice(parent, player_index)
             end
             -- any change to output makes next frame invisible
@@ -93,51 +93,17 @@ function create_input_buttons(gui_parent, graph)
     for ingredient_name, node in pairs(graph.inputs) do
         local left_button = gui_parent.add{type="sprite-button", sprite="utility/left_arrow", tooltip="use it's ingredient instead"}
         local ingredient_sprite = gui_parent.add{type="sprite", sprite=sprite_of(ingredient_name)}
-        local right_button = gui_parent.add{type="sprite-button", sprite="utility/right_arrow", tooltip = "use it's products instead"}
+        local right_button = gui_parent.add{type="sprite-button", sprite="utility/right_arrow", tooltip = "use it's targets instead"}
         register_gui_event_handler(left_button, defines.events.on_gui_click,
             function (e)
-                if next(node.children) ~= nil then
-                    for child_name, child_node in pairs(node.children) do
-                        graph.inputs[child_name] = child_node
-                    end
-                    graph.inputs[ingredient_name] = nil
-                    gui_parent.clear()
-                    create_input_buttons(gui_parent, graph)
-                    debug_print(graph.inputs:keys():tostring())
-                else
-                    debug_print("most basic ingredient doesn't allow break down")
-                end
+                graph:use_ingredients_as_input(ingredient_name)
+                gui_parent.clear()
+                create_input_buttons(gui_parent, graph)
             end
         )
         register_gui_event_handler(right_button, defines.events.on_gui_click,
             function (e)
-                for parent_name, _ in pairs(node.parents) do
-                    if graph.outputs:keys():has(parent_name) then
-                        debug_print("ingredient can't be more advanced")
-                        return
-                    end
-                end
-
-                graph.inputs[node.name] = nil
-                for parent_name, parent_node in pairs(node.parents) do
-                    graph.inputs[parent_name] = parent_node
-                end
-
-                -- remove unecessary input sources that are fully covered by other ingredients
-                local others = graph.inputs:shallow_copy()
-                local to_remove = {}
-                for input_name, input_node in pairs(graph.inputs) do
-                    others[input_name] = nil
-                    if input_node:produce_only(others:values()) then
-                        to_remove[#to_remove+1] = input_node
-                    end
-                    others[input_name] = input_node
-                end
-                for i, node in ipairs(to_remove) do
-                    graph.inputs[node.name] = nil
-                end
-
-                --update gui
+                graph:use_products_as_input(ingredient_name)
                 gui_parent.clear()
                 create_input_buttons(gui_parent, graph)
             end
@@ -151,16 +117,19 @@ function create_inputs_frame(parent, player_index)
             local input_select_frame = hori_flow.add{type = "frame", caption = "Input Items Select"}
                 local inputs_flow = input_select_frame.add{type = "flow", direction = "vertical"}
                     local inputs_table = inputs_flow.add{type = "table", column_count = 3}
+                inputs_flow.style.vertically_stretchable = true
             local outputs_frame = hori_flow.add{type = "frame", caption = "Final Products"}
                 local outputs_view_flow = outputs_frame.add{type = "flow", direction = "vertical", caption = "target outputs"}
+                outputs_view_flow.style.vertically_stretchable = true
         local confirm_button = frame.add{type = "button", caption = "confirm"}
     register_gui_event_handler(frame, defines.events.on_gui_opened,
         function(e)
-            local graph = generate_dependency_graph(e.player_index)
+            local graph = BlueprintGraph.new()
+            graph:generate_graph_by_outputs(global.blueprint_outputs[e.player_index])
 
             -- update outputs view
             outputs_view_flow.clear()
-            for k, v in pairs(graph.outputs) do
+            for k, _ in pairs(graph.outputs:keys()) do
                 outputs_view_flow.add{type="sprite", sprite=sprite_of(k)}
             end
 
