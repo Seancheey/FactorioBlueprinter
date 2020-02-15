@@ -39,7 +39,6 @@ function create_new_output_item_choice(parent, player_index)
     register_gui_event_handler(choose_button, defines.events.on_gui_elem_changed,
         function(e)
             item_choice.ingredient = e.element.elem_value
-            debug_print('recipe to ' .. tostring(item_choice.ingredient), e.player_index)
             -- expand table if full
             if outputs_table:all(function(x) return x.ingredient end) then
                 create_new_output_item_choice(parent, player_index)
@@ -52,7 +51,6 @@ function create_new_output_item_choice(parent, player_index)
     register_gui_event_handler(numfield, defines.events.on_gui_text_changed,
         function(e)
             item_choice.crafting_speed = (e.element.text ~= "" and tonumber(e.element.text) or 0) / unit_values[item_choice.unit]
-            debug_print('number to ' .. tostring(item_choice.crafting_speed), e.player_index)
         end
     )
     local unitbox = parent.add{type = "drop-down", items = output_units, selected_index = 1}
@@ -62,7 +60,6 @@ function create_new_output_item_choice(parent, player_index)
             -- recalculate item crafting speed according to new unit
             local new_num = item_choice.crafting_speed*unit_values[item_choice.unit]
             numfield.text = tostring(new_num)
-            debug_print('unit to ' .. item_choice.unit, e.player_index)
         end
     )
 end
@@ -129,8 +126,8 @@ function create_inputs_frame(parent, player_index)
 
             -- update outputs view
             outputs_view_flow.clear()
-            for k, _ in pairs(graph.outputs:keys()) do
-                outputs_view_flow.add{type="sprite", sprite=sprite_of(k)}
+            for output_name, _ in pairs(graph.outputs) do
+                outputs_view_flow.add{type="sprite", sprite=sprite_of(output_name)}
             end
 
             -- update inputs view

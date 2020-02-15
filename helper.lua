@@ -102,11 +102,11 @@ end
 
 
 function Table:tostring()
-    local keys = "{"
+    local keys = ""
     for k,v in pairs(self) do
         keys = keys .. tostring(k) .. ": " .. tostring(v) .. ","
     end
-    keys = keys:sub(1,-2) .. "}"
+    keys = "{" .. keys:sub(1,-2) .. "}"
     return keys
 end
 

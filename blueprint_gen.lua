@@ -85,6 +85,7 @@ function BlueprintGraph:generate_assember(recipe_name, crafting_speed, is_final)
         local node = self.dict[recipe_name]
         if is_final then
             for _, product in ipairs(node.products) do
+                debug_print("output:"..product.name)
                 self.outputs[product.name] = node
             end
         end
@@ -149,7 +150,6 @@ end
 
 function BlueprintGraph:use_products_as_input(item_name)
     nodes = self:assembers_whose_ingredients_have(item_name)
-    debug_print(self:tostring())
     if nodes:any(function(x) return self.outputs:has(x) end) then
         debug_print("ingredient can't be more advanced")
         return
