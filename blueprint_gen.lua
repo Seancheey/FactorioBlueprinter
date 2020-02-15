@@ -46,6 +46,10 @@ function AssemblerNode:products_fully_consumed_by(nodes)
     return false
 end
 
+function AssemblerNode:tostring()
+    return "{"..self.name.."  sources:"..self.sources:keys():tostring()..", targets:"..self.targets:keys():tostring().."}"
+end
+
 BlueprintGraph = {}
 function BlueprintGraph.__index(t, k)
     return BlueprintGraph[k] or Table[k] or t.dict[k]
@@ -145,6 +149,7 @@ end
 
 function BlueprintGraph:use_products_as_input(item_name)
     nodes = self:assembers_whose_ingredients_have(item_name)
+    debug_print(self:tostring())
     if nodes:any(function(x) return self.outputs:has(x) end) then
         debug_print("ingredient can't be more advanced")
         return
@@ -152,9 +157,9 @@ function BlueprintGraph:use_products_as_input(item_name)
 
     self.inputs[item_name] = nil
     for _, node in pairs(nodes) do
-        for _, parent_node in pairs(node.targets) do
-            for _, ingredient in ipairs(parent_node.ingredients) do
-                self.inputs[ingredient.name] = parent_node
+        for _, product in ipairs(node.products) do
+            for _, target in pairs(self:assembers_whose_ingredients_have(product.name)) do
+                self.inputs[product.name] = target
             end
         end
     end
@@ -188,7 +193,18 @@ function BlueprintGraph:use_ingredients_as_input(item_name)
     end
 end
 
-
+function BlueprintGraph:tostring(nodes, indent)
+    local indent = indent or 0
+    local nodes = nodes or self.outputs
+    local indent_str = ""
+    for i=1,indent do indent_str = indent_str.."  " end
+    local out = ""
+    for _, node in pairs(nodes) do
+        out = out..indent_str..node:tostring().."\n"
+        out = out..self:tostring(node.sources,indent+1).."\n"
+    end
+    return out:sub(1,-2)
+end
 
 
 -- function generate_dependency_graph(player_index)
