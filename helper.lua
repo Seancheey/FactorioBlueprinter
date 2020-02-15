@@ -106,7 +106,7 @@ function Table:tostring()
     for k,v in pairs(self) do
         keys = keys .. tostring(k) .. ": " .. tostring(v) .. ","
     end
-    keys = keys .. "}"
+    keys = keys:sub(1,-2) .. "}"
     return keys
 end
 
