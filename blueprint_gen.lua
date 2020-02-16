@@ -17,35 +17,6 @@ function AssemblerNode.new(o)
     return o
 end
 
-function AssemblerNode:is_sole_product_of(other)
-    if self == other then
-        return true
-    elseif next(other.targets) == nil then
-        return false
-    else
-        for _, parent in pairs(other.targets) do
-            if not self:is_sole_product_of(parent) then
-                return false
-            end
-        end
-        return true
-    end
-end
-
-function AssemblerNode:products_fully_consumed_by(nodes)
-    assert(self and nodes)
-    if next(self.targets) == nil then
-        return false
-    end
-    if nodes:has(self) then
-        return true
-    end
-    if self.targets:all(function (node) return node:products_fully_consumed_by(nodes) end) then
-        return true
-    end
-    return false
-end
-
 function AssemblerNode:tostring()
     return "{"..self.name.."  sources:"..self.sources:keys():tostring()..", targets:"..self.targets:keys():tostring().."}"
 end
@@ -148,6 +119,23 @@ function BlueprintGraph:assembers_whose_ingredients_have(item_name)
     return out
 end
 
+function BlueprintGraph:ingredient_fully_used_by(ingredient_name, item_list)
+    if self.outputs[ingredient_name] then
+        return false
+    end
+    if item_list:has(ingredient_name) then
+        return true
+    end
+    products = newtable{}
+    for _, node in ipairs(self:assembers_whose_ingredients_have(ingredient_name)) do
+        for _, p in ipairs(node.products) do
+            products[#products+1] = p.name
+        end
+    end
+    --debug_print(ingredient_name.."'s products:"..products:tostring())
+    return products:all(function(p) return self:ingredient_fully_used_by(p, item_list) end)
+end
+
 function BlueprintGraph:use_products_as_input(item_name)
     nodes = self:assembers_whose_ingredients_have(item_name)
     if nodes:any(function(x) return self.outputs:has(x) end) then
@@ -169,13 +157,13 @@ function BlueprintGraph:use_products_as_input(item_name)
     local to_remove = {}
     for input_name, input_node in pairs(self.inputs) do
         others[input_name] = nil
-        if input_node:products_fully_consumed_by(others) then
+        if self:ingredient_fully_used_by(input_name, others:keys()) then
             to_remove[input_name] = input_node
         end
         others[input_name] = input_node
     end
-    for input_name, node in ipairs(to_remove) do
-        debug_print(input_name.." is covered")
+    for input_name, node in pairs(to_remove) do
+        --debug_print(input_name.." is covered")
         self.inputs[input_name] = nil
     end
 end
@@ -205,36 +193,3 @@ function BlueprintGraph:tostring(nodes, indent)
     end
     return out:sub(1,-2)
 end
-
-
--- function generate_dependency_graph(player_index)
---     dependency = newtable{dict = newtable{}, outputs = newtable{}, inputs = newtable{}}
---     for k, item_choice in pairs(global.blueprint_outputs[player_index]) do
---         if item_choice.ingredient then
---             generate_dependency_helper(item_choice.ingredient, item_choice.crafting_speed, dependency, true)
---         end
---     end
---     return dependency
--- end
-
--- function generate_dependency_helper(ingredient_name, crafting_speed, dependency_graph, final_product)
---     final_product = final_product or false
---
---     dependency_graph.dict[ingredient_name] = dependency_graph.dict[ingredient_name] or AssemblerNode.new{name=ingredient_name, output_speed=0}
---     local node = dependency_graph.dict[ingredient_name]
---     if final_product then dependency_graph.outputs[ingredient_name] = node end
---     node.output_speed = node.output_speed + crafting_speed
---
---     --recursively generate its dependency
---     local recipe = game.recipe_prototypes[ingredient_name]
---     if recipe then
---         for i,ingredient in ipairs(recipe.sources) do
---             local child = generate_dependency_helper(ingredient.name, crafting_speed*ingredient.amount, dependency_graph)
---             node:add_child(child)
---             child:add_parent(node)
---         end
---     else
---         dependency_graph.inputs[ingredient_name] = node
---     end
---     return node
--- end

@@ -71,9 +71,20 @@ end
 
 function Table:map(f)
     assert(self and f)
-    out = {}
+    out = newtable{}
     for k, v in pairs(self) do
         out[k] = f(v)
+    end
+    return out
+end
+
+function Table:filter(f)
+    assert(self and f)
+    out = newtable{}
+    for k,v in pairs(self) do
+        if f(v) then
+            out[k] = v
+        end
     end
     return out
 end
