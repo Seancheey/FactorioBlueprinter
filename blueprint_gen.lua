@@ -193,3 +193,16 @@ function BlueprintGraph:tostring(nodes, indent)
     end
     return out:sub(1,-2)
 end
+
+function BlueprintGraph:generate_blueprint(item)
+    item.set_blueprint_entities({
+        {
+            entity_number=1,
+            name="assembling-machine-1",
+            position={x=1,y=1}
+        }
+    })
+end
+
+function BlueprintGraph:generate_entities()
+end
