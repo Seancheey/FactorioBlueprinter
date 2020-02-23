@@ -33,29 +33,27 @@ end
 
 
 function create_new_output_item_choice(parent, player_index)
-    local outputs_table = global.blueprint_outputs[player_index]
-    local item_choice = {recipe=nil, crafting_speed = 1, unit=output_units[1]}
-    outputs_table[#outputs_table+1] = item_choice
-    local suffix = tostring(#outputs_table)
-    local choose_button = parent.add{name = "bp_output_choose_button"..suffix, type = "choose-elem-button", elem_type = "recipe"}
+    local row_num = #global.blueprint_outputs[player_index] + 1
+    global.blueprint_outputs[player_index][row_num] = {crafting_speed = 1, unit=output_units[1]}
+    local choose_button = parent.add{name = "bp_output_choose_button"..tostring(row_num), type = "choose-elem-button", elem_type = "recipe"}
     register_gui_event_handler(player_index,choose_button, defines.events.on_gui_elem_changed,
-        function(e)
-            item_choice.ingredient = e.element.elem_value
+        function(e, global, env)
+            global.blueprint_outputs[e.player_index][env.row_num].ingredient = e.element.elem_value
             -- expand table if full
-            if outputs_table:all(function(x) return x.ingredient end) then
-                create_new_output_item_choice(parent, player_index)
+            if env.newtable(global.blueprint_outputs[e.player_index]):all(function(x) return x.ingredient end) then
+                create_new_output_item_choice(elem_of(env.parent_path, e.gui), e.player_index)
             end
             -- any change to output makes next frame invisible
             e.gui.left[inputs_frame].visible = false
         end
-    )
-    local numfield = parent.add{name = "bp_output_numfield"..suffix,type = "textfield", text = "1", numeric = true, allow_negative = false}
+    , {row_num = row_num, parent_path = path_of(parent)})
+    local numfield = parent.add{name = "bp_output_numfield"..tostring(row_num),type = "textfield", text = "1", numeric = true, allow_negative = false}
     register_gui_event_handler(player_index,numfield, defines.events.on_gui_text_changed,
         function(e)
             item_choice.crafting_speed = (e.element.text ~= "" and tonumber(e.element.text) or 0) / unit_values[item_choice.unit]
         end
     )
-    local unitbox = parent.add{name = "bp_output_dropdown"..suffix, type = "drop-down", items = output_units, selected_index = 1}
+    local unitbox = parent.add{name = "bp_output_dropdown"..tostring(row_num), type = "drop-down", items = output_units, selected_index = 1}
     register_gui_event_handler(player_index,unitbox, defines.events.on_gui_selection_state_changed,
         function(e)
             item_choice.unit = output_units[e.element.selected_index]

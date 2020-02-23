@@ -1,3 +1,5 @@
+require("helper")
+
 guilib_registered_events = {
     defines.events.on_gui_click,
     defines.events.on_gui_opened,
@@ -8,18 +10,21 @@ guilib_registered_events = {
 function __init_guilib_global(player_index)
     if not global.handlers then
         global.handlers = {}
+        global.consts = {}
     end
     if not global.handlers[player_index] then
         global.handlers[player_index] = {}
+        global.consts[player_index] = {}
     end
     for _, event in ipairs(guilib_registered_events) do
         if not global.handlers[player_index][event] then
             global.handlers[player_index][event] = {}
+            global.consts[player_index][event] = {}
         end
     end
 end
 
--- called in control.lua starting stage
+-- should be called in control.lua starting stage
 function guilib_start_listening_events()
     for _, event in ipairs(guilib_registered_events) do
         script.on_event(event, function(e)
@@ -28,7 +33,11 @@ function guilib_start_listening_events()
             for path, handle in pairs(global.handlers[e.player_index][event]) do
                 e.gui = game.players[e.player_index].gui
                 if e.element == elem_of(path, e.gui) then
-                    handle(e)
+                    local env = {}
+                    env.__index = global.consts[e.player_index][event][path]
+                    setmetatable(env, env)
+                    env.newtable = newtable
+                    handle(e, global, env)
                     break
                 end
             end
@@ -37,7 +46,7 @@ function guilib_start_listening_events()
 end
 
 -- helper function to easily register event handler
-function register_gui_event_handler(player_index, gui_elem, event, handler)
+function register_gui_event_handler(player_index, gui_elem, event, handler, consts_table)
     assert(player_index and gui_elem and event and type(handler) == "function")
     assert(gui_elem.name ~= "", "gui's name can't be nil")
     __init_guilib_global(player_index)
@@ -46,11 +55,13 @@ function register_gui_event_handler(player_index, gui_elem, event, handler)
     for _, elem_name in pairs(__path_split(gui_path)) do assert(elem_name ~= "", "there is an element in path of "..gui_elem.name.."without name") end
     debug_print("registering "..gui_path)
     global.handlers[player_index][event][gui_path] = handler
+    global.consts[player_index][event][gui_path] = consts_table
 end
 
 function unregister_gui_event_handler(player_index, gui_elem, event)
     assert(gui_elem.name)
     global.handlers[player_index][event][path_of(gui_elem)] = nil
+    global.consts[player_index][event][path_of(gui_elem)] = nil
 end
 
 -- returns the path of a gui element represented by a list in order of [elem_name, parent_name, ... , root_name]
