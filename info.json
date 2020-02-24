@@ -5,7 +5,7 @@
     "author": "Qiyi Shan",
     "contact": "adls371@outlook.com",
     "homepage": "",
-    "factorio_version": "0.17",
-    "dependencies": ["base >= 0.17"],
+    "factorio_version": "0.18",
+    "dependencies": ["base >= 0.18"],
     "description": "This mod gives you a new menu to produce any blueprint you want."
 }

@@ -10,7 +10,10 @@ function init_player_global(player_index)
     init_all_global(false)
     if not global.blueprint_outputs[player_index] then global.blueprint_outputs[player_index] = {} end
     if not global.blueprint_inputs[player_index] then global.blueprint_inputs[player_index] = {} end
-    if not global.settings[player_index] then global.settings[player_index] = {assembler = 1,belt = 1} end
+    if not global.settings[player_index] then global.settings[player_index] = {
+        belt = 1,
+        factory_priority = all_factories()
+    } end
     if not global.blueprint_graph[player_index] then global.blueprint_graph[player_index] = {} end
 end
 
@@ -35,8 +38,6 @@ end)
 
 --initialize blueprinter guis
 script.on_event(defines.events.on_player_joined_game,initialize_player_gui)
-
--- script.on_event(defines.events.on_player_created,initialize_player_gui)
 
 script.on_configuration_changed(function(data)
     debug_print("configuration changed, re-initialize blueprinter globals")

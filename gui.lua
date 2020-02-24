@@ -82,15 +82,22 @@ function create_outputs_frame(parent, player_index)
                 , {inputs_frame = inputs_frame})
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
                 local vertical_flow = tab_pane.add{type = "flow", name="vertical_flow",direction = "vertical"}
-                    local assembler_choose_label = vertical_flow.add{type = "label", caption = "Preferred assembling machine"}
-                    local assembler_choose_table = vertical_flow.add{type = "table", name="choose_table" , column_count = 6}
+                    local priority_label = vertical_flow.add{type = "label", name="priority_label", caption = "Factory Priorities", tooltip = "Factories in front will be picked to generate blueprints first"}
+                    local priority_table = vertical_flow.add{type = "table", name="priority_table", column_count = 8}
+                        for i, factory in ipairs(global.settings[player_index].factory_priority) do
+                            priority_table.add{type = "sprite", name = "sprite_"..tostring(i), sprite = sprite_of(factory.name)}
+                            priority_table.add{type = "sprite-button", name = "sort_up_"..tostring(i), sprite = "utility/left_arrow"}
+                        end
+
+                    local belt_label = vertical_flow.add{type = "label", name = "belt_label", caption="Belt Preference"}
+                    local blet_choose_table = vertical_flow.add{type = "table", name="choose_table" , column_count = 2*#all_belts}
                         local choose_buttons = {}
-                        for i = 1,3 do
-                            assembler_choose_table.add{type = "sprite", sprite = sprite_of("assembling-machine-"..tostring(i))}
-                            choose_buttons[i] = assembler_choose_table.add{name = "bp_setting_choose_assembler_button"..tostring(i), type = "radiobutton", state = global.settings[player_index].assembler == i}
+                        for i,belt_name in ipairs(all_belts) do
+                            blet_choose_table.add{type = "sprite", sprite = sprite_of(belt_name)}
+                            choose_buttons[i] = blet_choose_table.add{name = "bp_setting_choose_belt_button"..tostring(i), type = "radiobutton", state = global.settings[player_index].belt == i}
                             register_gui_event_handler(player_index,choose_buttons[i], defines.events.on_gui_click,
                                 function(e, global, env)
-                                    global.settings[e.player_index].assembler = env.i
+                                    global.settings[e.player_index].belt = env.i
                                     for other = 1,3 do
                                         if other ~= env.i then
                                             choose_buttons[other].state = false

@@ -1,4 +1,29 @@
 require("helper")
+
+all_belts = {"transport-belt", "fast-transport-belt", "express-transport-belt"}
+
+function all_factories()
+    local factories = {}
+    for _, entity in pairs(game.entity_prototypes) do
+        if entity.crafting_categories and not entity.flags["hidden"] then
+            factories[#factories+1] = entity
+        end
+    end
+    return factories
+end
+
+function factories_of_recipe(recipe_name)
+    local factories = {}
+    for _, factory in pairs(all_factories()) do
+        for entity_crafting_categories in next, factory.crafting_categories do
+            if entity_crafting_categories == recipe.category then
+                factories[#factories+1] = factory
+            end
+        end
+    end
+    return factories
+end
+
 AssemblerNode = {}
 -- AssemblerNode class inherents Table class
 function AssemblerNode.__index (t,k)
@@ -19,6 +44,13 @@ end
 
 function AssemblerNode:tostring()
     return "{"..self.name.."  sources:"..self.sources:keys():tostring()..", targets:"..self.targets:keys():tostring().."}"
+end
+
+function AssemblerNode:generate_blueprint(item, eid, xoff, yoff)
+    if not xoff then xoff = 0 end
+    if not yoff then yoff = 0 end
+
+    --return {inputs={ingre1={{x=1,y=2},{x=6,y=8}, ingre2={{x=1,y=2}}}, outputs={...}, width=, height=}
 end
 
 BlueprintGraph = {}
@@ -200,6 +232,7 @@ function BlueprintGraph:tostring(nodes, indent)
 end
 
 function BlueprintGraph:generate_blueprint(item)
+    local eid = 1
     item.set_blueprint_entities({
         {
             entity_number=1,
