@@ -47,7 +47,7 @@ end
 
 -- helper function to easily register event handler
 function register_gui_event_handler(player_index, gui_elem, event, handler, consts_table)
-    assert(player_index and gui_elem and event and type(handler) == "function")
+    assert(player_index and gui_elem and event and type(handler) == "function", "missing parameter")
     assert(gui_elem.name ~= "", "gui's name can't be nil")
     __init_guilib_global(player_index)
     --assert(global.handlers[event][gui_elem.name] == nil, "gui element "..gui_elem.name.." is already registered")
@@ -62,6 +62,11 @@ function unregister_gui_event_handler(player_index, gui_elem, event)
     assert(gui_elem.name)
     global.handlers[player_index][event][path_of(gui_elem)] = nil
     global.consts[player_index][event][path_of(gui_elem)] = nil
+end
+function unregister_gui_children_event_handler(player_index, gui_parent, event)
+    for _, child in pairs(gui_parent.children) do
+        unregister_gui_event_handler(player_index, child, event)
+    end
 end
 
 -- returns the path of a gui element represented by a list in order of [elem_name, parent_name, ... , root_name]
@@ -84,7 +89,7 @@ end
 
 function __elem_of_helper(path, gui, i)
     if path[i] then
-        if path[i] == "left" or path[i] == "right" or path[i] == "center" then
+        if path[i] == "left" or path[i] == "top" or path[i] == "center" then
             return __elem_of_helper(path, gui[path[i]], i+1)
         end
         for _, child in ipairs(gui.children) do
@@ -92,13 +97,13 @@ function __elem_of_helper(path, gui, i)
                 return __elem_of_helper(path, child, i+1)
             end
         end
-        assert(false, "path children is not found invalid when finding " .. path[i])
+        assert(false, "path children is not found/invalid when finding " .. path[i])
     else
         return gui
     end
 end
 
 function elem_of(path, gui)
-    assert(path and gui)
+    assert(path and gui, "Found missing/nil parameter")
     return __elem_of_helper(__path_split(path), gui, 1)
 end

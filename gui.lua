@@ -24,7 +24,7 @@ function create_blueprinter_button(player_index, parent)
         name = main_button
     }
     register_gui_event_handler(player_index,button, defines.events.on_gui_click,
-        function(e)
+        function(e, global, env)
             e.gui.left[main_frame].visible = not e.gui.left[main_frame].visible
             e.gui.left[inputs_frame].visible = false
         end
@@ -49,19 +49,21 @@ function create_new_output_item_choice(parent, player_index)
     , {row_num = row_num, parent_path = path_of(parent)})
     local numfield = parent.add{name = "bp_output_numfield"..tostring(row_num),type = "textfield", text = "1", numeric = true, allow_negative = false}
     register_gui_event_handler(player_index,numfield, defines.events.on_gui_text_changed,
-        function(e)
+        function(e, global, env)
+            local item_choice = global.blueprint_outputs[e.player_index][env.row_num]
             item_choice.crafting_speed = (e.element.text ~= "" and tonumber(e.element.text) or 0) / unit_values[item_choice.unit]
         end
-    )
+    , {row_num = row_num})
     local unitbox = parent.add{name = "bp_output_dropdown"..tostring(row_num), type = "drop-down", items = output_units, selected_index = 1}
     register_gui_event_handler(player_index,unitbox, defines.events.on_gui_selection_state_changed,
-        function(e)
-            item_choice.unit = output_units[e.element.selected_index]
+        function(e, global, env)
+            local item_choice = global.blueprint_outputs[e.player_index][env.row_num]
+            item_choice.unit = env.output_units[e.element.selected_index]
             -- recalculate item crafting speed according to new unit
-            local new_num = item_choice.crafting_speed*unit_values[item_choice.unit]
-            numfield.text = tostring(new_num)
+            local new_num = item_choice.crafting_speed*env.unit_values[item_choice.unit]
+            elem_of(env.field_path, e.gui).text = tostring(new_num)
         end
-    )
+    , {row_num = row_num, output_units = output_units, unit_values=unit_values, field_path = path_of(numfield)})
 end
 
 function create_outputs_frame(parent, player_index)
@@ -73,11 +75,11 @@ function create_outputs_frame(parent, player_index)
                     create_new_output_item_choice(output_table, player_index)
                 local confirm_button = output_flow.add{name = "bp_output_confirm_button", type = "button", caption = "confirm"}
                 register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
-                    function(e)
-                        e.gui.left[inputs_frame].visible = true
-                        script.raise_event(defines.events.on_gui_opened, {player_index = player_index, element = e.gui.left[inputs_frame]})
+                    function(e, global, env)
+                        e.gui.left[env.inputs_frame].visible = true
+                        script.raise_event(defines.events.on_gui_opened, {player_index = player_index, element = e.gui.left[env.inputs_frame]})
                     end
-                )
+                , {inputs_frame = inputs_frame})
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
                 local vertical_flow = tab_pane.add{type = "flow", name="vertical_flow",direction = "vertical"}
                     local assembler_choose_label = vertical_flow.add{type = "label", caption = "Preferred assembling machine"}
@@ -87,15 +89,15 @@ function create_outputs_frame(parent, player_index)
                             assembler_choose_table.add{type = "sprite", sprite = sprite_of("assembling-machine-"..tostring(i))}
                             choose_buttons[i] = assembler_choose_table.add{name = "bp_setting_choose_assembler_button"..tostring(i), type = "radiobutton", state = global.settings[player_index].assembler == i}
                             register_gui_event_handler(player_index,choose_buttons[i], defines.events.on_gui_click,
-                                function(e)
-                                    global.settings[player_index].assembler = i
+                                function(e, global, env)
+                                    global.settings[e.player_index].assembler = env.i
                                     for other = 1,3 do
-                                        if other ~= i then
+                                        if other ~= env.i then
                                             choose_buttons[other].state = false
                                         end
                                     end
                                 end
-                            )
+                            , {i=i})
                         end
             tab_pane.add_tab(output_tab, output_flow)
             tab_pane.add_tab(setting_tab, vertical_flow)
@@ -105,23 +107,27 @@ end
 
 function create_input_buttons(player_index, gui_parent, graph)
     for ingredient_name, node in pairs(graph.inputs) do
-        local left_button = gui_parent.add{type="sprite-button", sprite="utility/left_arrow", tooltip="use it's ingredient instead"}
-        local ingredient_sprite = gui_parent.add{type="sprite", sprite=sprite_of(ingredient_name)}
-        local right_button = gui_parent.add{type="sprite-button", sprite="utility/right_arrow", tooltip = "use it's targets instead"}
+        local left_button = gui_parent.add{type="sprite-button", name = "left_button_"..ingredient_name, sprite="utility/left_arrow", tooltip="use it's ingredient instead"}
+        local ingredient_sprite = gui_parent.add{type="sprite", name = "sprite_"..ingredient_name, sprite=sprite_of(ingredient_name)}
+        local right_button = gui_parent.add{type="sprite-button", name = "right_button_"..ingredient_name, sprite="utility/right_arrow", tooltip = "use it's targets instead"}
         register_gui_event_handler(player_index,left_button, defines.events.on_gui_click,
-            function (e)
+            function(e, global, env)
                 graph:use_ingredients_as_input(ingredient_name)
+                local gui_parent = elem_of(env.parent_path, e.gui)
+                unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
                 gui_parent.clear()
                 create_input_buttons(player_index, gui_parent, graph)
             end
-        )
+        , {parent_path = path_of(gui_parent)})
         register_gui_event_handler(player_index,right_button, defines.events.on_gui_click,
-            function (e)
+            function(e, global, env)
                 graph:use_products_as_input(ingredient_name)
+                local gui_parent = elem_of(env.parent_path, e.gui)
+                unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
                 gui_parent.clear()
                 create_input_buttons(player_index, gui_parent, graph)
             end
-        )
+        , {parent_path = path_of(gui_parent)})
     end
 end
 
@@ -137,10 +143,10 @@ function create_inputs_frame(parent, player_index)
                 outputs_view_flow.style.vertically_stretchable = true
         local confirm_button = frame.add{type = "button", name = "confirm_button", caption = "confirm"}
     register_gui_event_handler(player_index, frame, defines.events.on_gui_opened,
-        function(e)
+        function(e, global, env)
             local graph = BlueprintGraph.new()
             register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
-                function(e)
+                function(e, global, env)
                     game.players[e.player_index].insert("blueprint")
                     local item = game.players[e.player_index].get_main_inventory().find_item_stack("blueprint")
                     graph:generate_blueprint(item)
