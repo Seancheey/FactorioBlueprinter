@@ -53,7 +53,7 @@ function register_gui_event_handler(player_index, gui_elem, event, handler, cons
     --assert(global.handlers[event][gui_elem.name] == nil, "gui element "..gui_elem.name.." is already registered")
     gui_path = path_of(gui_elem)
     for _, elem_name in pairs(__path_split(gui_path)) do assert(elem_name ~= "", "there is an element in path of "..gui_elem.name.."without name") end
-    debug_print("registering "..gui_path)
+    --debug_print("registering "..gui_path)
     global.handlers[player_index][event][gui_path] = handler
     global.consts[player_index][event][gui_path] = consts_table
 end

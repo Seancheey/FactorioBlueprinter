@@ -77,7 +77,7 @@ function create_outputs_frame(parent, player_index)
                 register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
                     function(e, global, env)
                         e.gui.left[env.inputs_frame].visible = true
-                        script.raise_event(defines.events.on_gui_opened, {player_index = player_index, element = e.gui.left[env.inputs_frame]})
+                        script.raise_event(defines.events.on_gui_opened, {player_index = e.player_index, element = e.gui.left[env.inputs_frame]})
                     end
                 , {inputs_frame = inputs_frame})
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
@@ -105,29 +105,29 @@ function create_outputs_frame(parent, player_index)
     return frame
 end
 
-function create_input_buttons(player_index, gui_parent, graph)
-    for ingredient_name, node in pairs(graph.inputs) do
+function create_input_buttons(player_index, gui_parent)
+    for ingredient_name, node in pairs(global.blueprint_graph[player_index].inputs) do
         local left_button = gui_parent.add{type="sprite-button", name = "left_button_"..ingredient_name, sprite="utility/left_arrow", tooltip="use it's ingredient instead"}
         local ingredient_sprite = gui_parent.add{type="sprite", name = "sprite_"..ingredient_name, sprite=sprite_of(ingredient_name)}
         local right_button = gui_parent.add{type="sprite-button", name = "right_button_"..ingredient_name, sprite="utility/right_arrow", tooltip = "use it's targets instead"}
         register_gui_event_handler(player_index,left_button, defines.events.on_gui_click,
             function(e, global, env)
-                graph:use_ingredients_as_input(ingredient_name)
+                env.BlueprintGraph.use_ingredients_as_input(global.blueprint_graph[e.player_index], ingredient_name)
                 local gui_parent = elem_of(env.parent_path, e.gui)
                 unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
                 gui_parent.clear()
-                create_input_buttons(player_index, gui_parent, graph)
+                create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
             end
-        , {parent_path = path_of(gui_parent)})
+        , {parent_path = path_of(gui_parent), BlueprintGraph = BlueprintGraph})
         register_gui_event_handler(player_index,right_button, defines.events.on_gui_click,
             function(e, global, env)
-                graph:use_products_as_input(ingredient_name)
+                env.BlueprintGraph.use_products_as_input(global.blueprint_graph[e.player_index], ingredient_name)
                 local gui_parent = elem_of(env.parent_path, e.gui)
                 unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
                 gui_parent.clear()
-                create_input_buttons(player_index, gui_parent, graph)
+                create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
             end
-        , {parent_path = path_of(gui_parent)})
+        , {parent_path = path_of(gui_parent), BlueprintGraph = BlueprintGraph})
     end
 end
 
@@ -138,33 +138,36 @@ function create_inputs_frame(parent, player_index)
                 local inputs_flow = input_select_frame.add{type = "flow", name = "inputs_flow", direction = "vertical"}
                     local inputs_table = inputs_flow.add{type = "table", name = "inputs_table", column_count = 3}
                 inputs_flow.style.vertically_stretchable = true
-            local outputs_frame = hori_flow.add{type = "frame", caption = "Final Products"}
-                local outputs_view_flow = outputs_frame.add{type = "flow", direction = "vertical", caption = "target outputs"}
+            local outputs_frame = hori_flow.add{type = "frame", name = "outputs_frame", caption = "Final Products"}
+                local outputs_view_flow = outputs_frame.add{type = "flow", name = "outputs_view_flow",direction = "vertical", caption = "target outputs"}
                 outputs_view_flow.style.vertically_stretchable = true
         local confirm_button = frame.add{type = "button", name = "confirm_button", caption = "confirm"}
     register_gui_event_handler(player_index, frame, defines.events.on_gui_opened,
         function(e, global, env)
-            local graph = BlueprintGraph.new()
-            register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
+            local graph = env.BlueprintGraph.new()
+            global.blueprint_graph[e.player_index] = graph
+            register_gui_event_handler(e.player_index, elem_of(env.confirm_button_path, e.gui), defines.events.on_gui_click,
                 function(e, global, env)
                     game.players[e.player_index].insert("blueprint")
                     local item = game.players[e.player_index].get_main_inventory().find_item_stack("blueprint")
-                    graph:generate_blueprint(item)
+                    env.BlueprintGraph.generate_blueprint(global.blueprint_graph[e.player_index], item)
                 end
-            )
+            ,{BlueprintGraph = BlueprintGraph})
 
             graph:generate_graph_by_outputs(global.blueprint_outputs[e.player_index])
 
             -- update outputs view
-            outputs_view_flow.clear()
+            elem_of(env.output_view_path, e.gui).clear()
             for output_name, _ in pairs(graph.outputs) do
-                outputs_view_flow.add{type="sprite", sprite=sprite_of(output_name)}
+                elem_of(env.output_view_path, e.gui).add{type="sprite", sprite=sprite_of(output_name)}
             end
 
             -- update inputs view
+            local inputs_table = elem_of(env.inputs_table_path, e.gui)
+            unregister_gui_children_event_handler(e.player_index, inputs_table, defines.events.on_gui_click)
             inputs_table.clear()
             create_input_buttons(player_index, inputs_table, graph)
         end
-    )
+    ,{BlueprintGraph = BlueprintGraph, confirm_button_path = path_of(confirm_button), output_view_path = path_of(outputs_view_flow), inputs_table_path = path_of(inputs_table)})
     return frame
 end

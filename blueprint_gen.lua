@@ -101,6 +101,7 @@ function BlueprintGraph:assembers_whose_products_have(item_name)
 end
 
 function BlueprintGraph:assembers_whose_ingredients_have(item_name)
+    assert(self and item_name)
     local out = newtable{}
     if self[item_name] then
         for _, node in pairs(self[item_name].targets) do
@@ -137,6 +138,8 @@ function BlueprintGraph:ingredient_fully_used_by(ingredient_name, item_list)
 end
 
 function BlueprintGraph:use_products_as_input(item_name)
+    self.__index = BlueprintGraph.__index
+    setmetatable(self, self)
     nodes = self:assembers_whose_ingredients_have(item_name)
     if nodes:any(function(x) return self.outputs:has(x) end) then
         debug_print("ingredient can't be more advanced")
@@ -169,6 +172,8 @@ function BlueprintGraph:use_products_as_input(item_name)
 end
 
 function BlueprintGraph:use_ingredients_as_input(item_name)
+    self.__index = BlueprintGraph.__index
+    setmetatable(self, self)
     local viable = false
     for _, node in pairs(self:assembers_whose_products_have(item_name)) do
         for _, ingredient in pairs(node.ingredients) do

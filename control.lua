@@ -2,6 +2,7 @@ require("gui")
 function init_all_global(reset)
     if reset or not global.blueprint_outputs then global.blueprint_outputs = {} end
     if reset or not global.blueprint_inputs then global.blueprint_inputs = {} end
+    if reset or not global.blueprint_graph then global.blueprint_graph = {} end
     if reset or not global.settings then global.settings = newtable{} end
 end
 
@@ -10,6 +11,7 @@ function init_player_global(player_index)
     if not global.blueprint_outputs[player_index] then global.blueprint_outputs[player_index] = {} end
     if not global.blueprint_inputs[player_index] then global.blueprint_inputs[player_index] = {} end
     if not global.settings[player_index] then global.settings[player_index] = {assembler = 1,belt = 1} end
+    if not global.blueprint_graph[player_index] then global.blueprint_graph[player_index] = {} end
 end
 
 function initialize_player_gui(e)
