@@ -86,25 +86,39 @@ function create_outputs_frame(parent, player_index)
                     local priority_table = vertical_flow.add{type = "table", name="priority_table", column_count = 8}
                         for i, factory in ipairs(global.settings[player_index].factory_priority) do
                             priority_table.add{type = "sprite", name = "sprite_"..tostring(i), sprite = sprite_of(factory.name)}
-                            priority_table.add{type = "sprite-button", name = "sort_up_"..tostring(i), sprite = "utility/left_arrow"}
+                            local factory_button = priority_table.add{type = "sprite-button", name = "sort_up_"..tostring(i), sprite = "utility/left_arrow"}
+                            register_gui_event_handler(player_index, factory_button, defines.events.on_gui_click,
+                                function(e, globa, env)
+                                    -- eliminate first button
+                                    if env.i <= 1 then return end
+                                    -- sway global setting
+                                    local priority = global.settings[e.player_index].factory_priority
+                                    local this = priority[env.i]
+                                    local swapped = priority[env.i-1]
+                                    priority[env.i] = swapped
+                                    priority[env.i-1] = this
+                                    -- sway gui
+                                    elem_of(env.parent_path.."|sprite_"..tostring(env.i),e.gui).sprite = sprite_of(swapped.name)
+                                    elem_of(env.parent_path.."|sprite_"..tostring(env.i-1),e.gui).sprite = sprite_of(this.name)
+                                end
+                            , {i=i, parent_path = path_of(priority_table)})
                         end
 
                     local belt_label = vertical_flow.add{type = "label", name = "belt_label", caption="Belt Preference"}
-                    local blet_choose_table = vertical_flow.add{type = "table", name="choose_table" , column_count = 2*#all_belts}
-                        local choose_buttons = {}
+                    local belt_choose_table = vertical_flow.add{type = "table", name="choose_table" , column_count = 2*#all_belts}
                         for i,belt_name in ipairs(all_belts) do
-                            blet_choose_table.add{type = "sprite", sprite = sprite_of(belt_name)}
-                            choose_buttons[i] = blet_choose_table.add{name = "bp_setting_choose_belt_button"..tostring(i), type = "radiobutton", state = global.settings[player_index].belt == i}
-                            register_gui_event_handler(player_index,choose_buttons[i], defines.events.on_gui_click,
+                            belt_choose_table.add{type = "sprite", sprite = sprite_of(belt_name)}
+                            local choose_button = belt_choose_table.add{name = "bp_setting_choose_belt_button"..tostring(i), type = "radiobutton", state = global.settings[player_index].belt == i}
+                            register_gui_event_handler(player_index,choose_button, defines.events.on_gui_click,
                                 function(e, global, env)
                                     global.settings[e.player_index].belt = env.i
                                     for other = 1,3 do
                                         if other ~= env.i then
-                                            choose_buttons[other].state = false
+                                            elem_of(env.parent_path.."|bp_setting_choose_belt_button"..tostring(other), e.gui).state = false
                                         end
                                     end
                                 end
-                            , {i=i})
+                            , {i=i, parent_path = path_of(belt_choose_table)})
                         end
             tab_pane.add_tab(output_tab, output_flow)
             tab_pane.add_tab(setting_tab, vertical_flow)
