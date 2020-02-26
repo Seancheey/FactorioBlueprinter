@@ -77,7 +77,7 @@ function create_outputs_frame(parent, player_index)
                 register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
                     function(e, global, env)
                         e.gui.left[env.inputs_frame].visible = true
-                        script.raise_event(defines.events.on_gui_opened, {player_index = e.player_index, element = e.gui.left[env.inputs_frame]})
+                        update_input_frame(e.player_index)
                     end
                 , {inputs_frame = inputs_frame})
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
@@ -158,37 +158,41 @@ function create_inputs_frame(parent, player_index)
             local input_select_frame = hori_flow.add{type = "frame", name = "input_select_frame", caption = "Input Items Select"}
                 local inputs_flow = input_select_frame.add{type = "flow", name = "inputs_flow", direction = "vertical"}
                     local inputs_table = inputs_flow.add{type = "table", name = "inputs_table", column_count = 3}
+                    global.inputs_table_path = path_of(inputs_table)
                 inputs_flow.style.vertically_stretchable = true
             local outputs_frame = hori_flow.add{type = "frame", name = "outputs_frame", caption = "Final Products"}
                 local outputs_view_flow = outputs_frame.add{type = "flow", name = "outputs_view_flow",direction = "vertical", caption = "target outputs"}
+                global.output_view_path = path_of(outputs_view_flow)
                 outputs_view_flow.style.vertically_stretchable = true
         local confirm_button = frame.add{type = "button", name = "confirm_button", caption = "confirm"}
-    register_gui_event_handler(player_index, frame, defines.events.on_gui_opened,
-        function(e, global, env)
-            local graph = env.BlueprintGraph.new()
-            global.blueprint_graph[e.player_index] = graph
-            register_gui_event_handler(e.player_index, elem_of(env.confirm_button_path, e.gui), defines.events.on_gui_click,
-                function(e, global, env)
-                    game.players[e.player_index].insert("blueprint")
-                    local item = game.players[e.player_index].get_main_inventory().find_item_stack("blueprint")
-                    env.BlueprintGraph.generate_blueprint(global.blueprint_graph[e.player_index], item)
-                end
-            ,{BlueprintGraph = BlueprintGraph})
-
-            graph:generate_graph_by_outputs(global.blueprint_outputs[e.player_index])
-
-            -- update outputs view
-            elem_of(env.output_view_path, e.gui).clear()
-            for output_name, _ in pairs(graph.outputs) do
-                elem_of(env.output_view_path, e.gui).add{type="sprite", sprite=sprite_of(output_name)}
+        register_gui_event_handler(
+            player_index,
+            confirm_button,
+            defines.events.on_gui_click,
+            function(e, global, env)
+                game.players[e.player_index].insert("blueprint")
+                local item = game.players[e.player_index].get_main_inventory().find_item_stack("blueprint")
+                BlueprintGraph.generate_blueprint(global.blueprint_graph[e.player_index], item)
             end
-
-            -- update inputs view
-            local inputs_table = elem_of(env.inputs_table_path, e.gui)
-            unregister_gui_children_event_handler(e.player_index, inputs_table, defines.events.on_gui_click)
-            inputs_table.clear()
-            create_input_buttons(player_index, inputs_table, graph)
-        end
-    ,{BlueprintGraph = BlueprintGraph, confirm_button_path = path_of(confirm_button), output_view_path = path_of(outputs_view_flow), inputs_table_path = path_of(inputs_table)})
+        ,{BlueprintGraph = BlueprintGraph})
     return frame
+end
+
+function update_input_frame(player_index)
+    local graph = BlueprintGraph.new()
+    global.blueprint_graph[player_index] = graph
+
+    graph:generate_graph_by_outputs(global.blueprint_outputs[player_index])
+    local gui = game.players[player_index].gui
+    -- update outputs view
+    elem_of(global.output_view_path, gui).clear()
+    for output_name, _ in pairs(graph.outputs) do
+        elem_of(global.output_view_path, gui).add{type="sprite", sprite=sprite_of(output_name)}
+    end
+
+    -- update inputs view
+    local inputs_table = elem_of(global.inputs_table_path, gui)
+    unregister_gui_children_event_handler(player_index, inputs_table, defines.events.on_gui_click)
+    inputs_table.clear()
+    create_input_buttons(player_index, inputs_table, graph)
 end

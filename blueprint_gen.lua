@@ -5,7 +5,7 @@ all_belts = {"transport-belt", "fast-transport-belt", "express-transport-belt"}
 function all_factories()
     local factories = {}
     for _, entity in pairs(game.entity_prototypes) do
-        if entity.crafting_categories and not entity.flags["hidden"] then
+        if entity.crafting_categories and not entity.flags["hidden"] and entity.name ~= "character" then
             factories[#factories+1] = entity
         end
     end
@@ -22,6 +22,17 @@ function factories_of_recipe(recipe_name)
         end
     end
     return factories
+end
+
+function preferred_factory_of_recipe(recipe_name, player_index)
+    for _, factory in ipairs(global.settings[player_index].factory_priority) do
+        for _, avaliable in ipairs(factories_of_recipe(recipe_name)) do
+            if factory == avaliable then
+                return factory
+            end
+        end
+    end
+    assert(false, recipe_name.." has no preferred factory")
 end
 
 AssemblerNode = {}
@@ -49,7 +60,21 @@ end
 function AssemblerNode:generate_blueprint(item, eid, xoff, yoff)
     if not xoff then xoff = 0 end
     if not yoff then yoff = 0 end
-
+    -- determine if there is belt bottleneck for single row layout
+    local belt_speed = 15 --[[ should become player's preference later ]]
+    local max_row = 1
+    for _, product in ipairs(self.recipe.products) do
+        if product.type == "item" then
+            local row_num = product.amount * self.recipe_speed / belt_speed
+            if row_num > max_row then max_row = row_num end
+        end
+    end
+    for _, ingredient in ipairs(self.recipe.ingredients) do
+        if ingredient.type == "item" then
+            local row_num = ingredient.amount * self.recipe_speed / belt_speed
+            if row_num > max_row then max_row = row_num end
+        end
+    end
     --return {inputs={ingre1={{x=1,y=2},{x=6,y=8}, ingre2={{x=1,y=2}}}, outputs={...}, width=, height=}
 end
 
