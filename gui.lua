@@ -105,8 +105,8 @@ function create_outputs_frame(parent, player_index)
                         end
 
                     local belt_label = vertical_flow.add{type = "label", name = "belt_label", caption="Belt Preference"}
-                    local belt_choose_table = vertical_flow.add{type = "table", name="choose_table" , column_count = 2*#all_belts}
-                        for i,belt_name in ipairs(all_belts) do
+                    local belt_choose_table = vertical_flow.add{type = "table", name="choose_table" , column_count = 2*#ALL_BELTS}
+                        for i,belt_name in ipairs(ALL_BELTS) do
                             belt_choose_table.add{type = "sprite", sprite = sprite_of(belt_name)}
                             local choose_button = belt_choose_table.add{name = "bp_setting_choose_belt_button"..tostring(i), type = "radiobutton", state = global.settings[player_index].belt == i}
                             register_gui_event_handler(player_index,choose_button, defines.events.on_gui_click,
@@ -172,7 +172,7 @@ function create_inputs_frame(parent, player_index)
             function(e, global, env)
                 game.players[e.player_index].insert("blueprint")
                 local item = game.players[e.player_index].get_main_inventory().find_item_stack("blueprint")
-                BlueprintGraph.generate_blueprint(global.blueprint_graph[e.player_index], item)
+                BlueprintGraph.generate_blueprint(global.blueprint_graph[e.player_index], e.player_index, item)
             end
         ,{BlueprintGraph = BlueprintGraph})
     return frame

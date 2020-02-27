@@ -1,7 +1,15 @@
 require("helper")
 
-all_belts = {"transport-belt", "fast-transport-belt", "express-transport-belt"}
-
+ALL_BELTS = {"transport-belt", "fast-transport-belt", "express-transport-belt"}
+INSERTER_SPEEDS = {
+    ["burner-inserter"] = 0.6,
+    ["inserter"] = 0.83,
+    ["long-handed-inserter"] = 1.2,
+    ["fast-inserter"] = 2.31,
+    ["filter-inserter"] = 2.31,
+    ["stack-inserter"] = 2.31,
+    ["stack-filter-inserter"] = 2.31
+}
 function all_factories()
     local factories = {}
     for _, entity in pairs(game.entity_prototypes) do
@@ -16,7 +24,7 @@ function factories_of_recipe(recipe_name)
     local factories = {}
     for _, factory in pairs(all_factories()) do
         for entity_crafting_categories in next, factory.crafting_categories do
-            if entity_crafting_categories == recipe.category then
+            if entity_crafting_categories == game.recipe_prototypes[recipe_name].category then
                 factories[#factories+1] = factory
             end
         end
@@ -33,6 +41,14 @@ function preferred_factory_of_recipe(recipe_name, player_index)
         end
     end
     assert(false, recipe_name.." has no preferred factory")
+end
+
+function belt_speed_of(item_name)
+    return game.entity_prototypes[item_name].belt_speed
+end
+
+function preferred_belt(player_index)
+    return ALL_BELTS[global.settings[player_index].belt]
 end
 
 AssemblerNode = {}
@@ -53,15 +69,85 @@ function AssemblerNode.new(o)
     return o
 end
 
+function create_crafting_unit(entities, recipe_name, factory_name, belt_name, xoff, yoff, belt_positions, factory_off, inserter_positions)
+    local factory_size = 3 -- should be determined from prototype
+    if belt_positions == nil or factory_off == nil or inserter_positions == nil then
+        -- three templates
+        local input_num = #game.recipe_prototypes[recipe_name].ingredients
+        local output_num = #game.recipe_prototypes[recipe_name].products
+        local item_speeds = {}
+        for _, ingredient in ipairs(game.recipe_prototypes[recipe_name].ingredients) do
+            item_speeds[ingredient.name] = ingredient.amount * game.entity_prototypes[factory_name].crafting_speed
+        end
+        for _, product in ipairs(game.recipe_prototypes[recipe_name].products) do
+            item_speeds[product.name] = product.amount * game.entity_prototypes[factory_name].crafting_speed
+        end
+        -- TODO: adjust inserter type according to item speeds
+        if input_num == 1 and output_num == 1 then
+            belt_positions = {[0]=defines.direction.north, [factory_size+3]=defines.direction.north}
+            inserter_positions = {[1]={{name="fast-inserter", direction=defines.direction.south}}, [factory_size+2]={{name="fast-inserter", direction=defines.direction.south}}}
+            factory_off = 2
+        elseif input_num == 2 and output_num == 1 then
+            belt_positions = {[0]=defines.direction.north, [factory_size+3]=defines.direction.north, [factory_size+4]=defines.direction.north}
+            inserter_positions = {[1]={{name="fast-inserter", direction=defines.direction.south}}, [factory_size+2]={{name="fast-inserter", direction=defines.direction.south}, {name="long-handed-inserter", direction=defines.direction.south}}}
+            factory_off = 2
+        elseif input_num == 3 and output_num == 1 then
+            belt_positions = {[0]=defines.direction.north, [1]=defines.direction.south, [factory_size+4]=defines.direction.north, [factory_size+5]=defines.direction.north}
+            inserter_positions = {[2]={{name="fast-inserter", direction=defines.direction.north}, {name="long-handed-inserter", direction=defines.direction.south}}, [factory_size+3]={{name="fast-inserter", direction=defines.direction.south}, {name="long-handed-inserter", direction=defines.direction.south}}}
+            factory_off = 3
+        else
+            debug_print("Unsupported recipe "..recipe_name.."with "..input_num.." inputs and "..output_num.." outputs")
+        end
+    end
+    local eid = #entities+1
+    -- setup belts
+    for x = 0, factory_size-1 do
+        for y, direction in pairs(belt_positions) do
+            entities[eid] = {
+                entity_number = eid,
+                name = belt_name,
+                position = {x=x+xoff,y=y+yoff},
+                direction = defines.direction.east,
+            }
+            eid = eid + 1
+        end
+    end
+    -- -- setup factory
+    entities[eid] = {
+        entity_number = eid,
+        name = factory_name,
+        position = {x=xoff+math.floor(factory_size/2),y=math.floor(factory_size/2)+factory_off+yoff},
+        recipe = recipe_name
+    }
+    eid = eid + 1
+    -- setup inserters
+    for y, inserters in pairs(inserter_positions) do
+        for x, config in ipairs(inserters) do
+            entities[eid] = {
+                entity_number = eid,
+                name = config.name,
+                position = {x=x-1+xoff, y=y+yoff},
+                direction = config.direction
+            }
+            eid = eid + 1
+        end
+    end
+    return belt_positions, factory_off
+end
+
+function create_crafting_row_units(blueprint_item, recipe_name, factory_name, unit_num_in_row, belt_name, xoff, yoff, eid)
+
+end
+
 function AssemblerNode:tostring()
     return "{"..self.name.."  sources:"..self.sources:keys():tostring()..", targets:"..self.targets:keys():tostring().."}"
 end
 
-function AssemblerNode:generate_blueprint(item, eid, xoff, yoff)
+function AssemblerNode:generate_blueprint(player_index, item, eid, xoff, yoff)
     if not xoff then xoff = 0 end
     if not yoff then yoff = 0 end
     -- determine if there is belt bottleneck for single row layout
-    local belt_speed = 15 --[[ should become player's preference later ]]
+    local belt_speed = belt_speed_of(ALL_BELTS[global.settings[player_index].belt]) --[[ should become player's preference later ]]
     local max_row = 1
     for _, product in ipairs(self.recipe.products) do
         if product.type == "item" then
@@ -75,6 +161,7 @@ function AssemblerNode:generate_blueprint(item, eid, xoff, yoff)
             if row_num > max_row then max_row = row_num end
         end
     end
+
     --return {inputs={ingre1={{x=1,y=2},{x=6,y=8}, ingre2={{x=1,y=2}}}, outputs={...}, width=, height=}
 end
 
@@ -256,15 +343,11 @@ function BlueprintGraph:tostring(nodes, indent)
     return out:sub(1,-2)
 end
 
-function BlueprintGraph:generate_blueprint(item)
+function BlueprintGraph:generate_blueprint(player_index, item)
     local eid = 1
-    item.set_blueprint_entities({
-        {
-            entity_number=1,
-            name="assembling-machine-1",
-            position={x=1,y=1}
-        }
-    })
+    local entities={}
+    create_crafting_unit(entities, "inserter", factories_of_recipe("inserter")[1].name, preferred_belt(player_index), 0, 0)
+    item.set_blueprint_entities(entities)
 end
 
 function BlueprintGraph:generate_entities()
