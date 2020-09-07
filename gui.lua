@@ -47,14 +47,14 @@ function __create_new_output_item_choice(player_index, parent)
             -- any change to output makes next frame invisible
             e.gui.left[inputs_frame].visible = false
         end
-    , {row_num = row_num, parent_path = path_of(parent)})
-    local numfield = parent.add{name = "bp_output_numfield"..tostring(row_num),type = "textfield", text = "1", numeric = true, allow_negative = false}
-    register_gui_event_handler(player_index,numfield, defines.events.on_gui_text_changed,
+    )
+    local num_field = parent.add{ name = "bp_output_numfield"..tostring(row_num), type = "textfield", text = "1", numeric = true, allow_negative = false}
+    register_gui_event_handler(player_index, num_field, defines.events.on_gui_text_changed,
         function(e)
             local item_choice = global.blueprint_outputs[e.player_index][row_num]
             item_choice.crafting_speed = (e.element.text ~= "" and tonumber(e.element.text) or 0) / unit_values[item_choice.unit]
         end
-    , {row_num = row_num})
+    )
     local unit_box = parent.add{ name = "bp_output_dropdown"..tostring(row_num), type = "drop-down", items = output_units, selected_index = 1}
     register_gui_event_handler(player_index, unit_box, defines.events.on_gui_selection_state_changed,
         function(e)
@@ -62,9 +62,9 @@ function __create_new_output_item_choice(player_index, parent)
             item_choice.unit = output_units[e.element.selected_index]
             -- recalculate item crafting speed according to new unit
             local new_num = item_choice.crafting_speed*unit_values[item_choice.unit]
-            elem_of(field_path, e.gui).text = tostring(new_num)
+            num_field.text = tostring(new_num)
         end
-    , {row_num = row_num, output_units = output_units, unit_values=unit_values, field_path = path_of(numfield)})
+    )
 end
 
 function __create_outputs_frame(player_index, parent)
@@ -80,7 +80,7 @@ function __create_outputs_frame(player_index, parent)
                         e.gui.left[inputs_frame].visible = true
                         __update_input_frame(e.player_index)
                     end
-                , {inputs_frame = inputs_frame})
+                )
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
                 local vertical_flow = tab_pane.add{type = "flow", name="vertical_flow",direction = "vertical"}
                     local priority_label = vertical_flow.add{type = "label", name="priority_label", caption = "Factory Priorities", tooltip = "Factories in front will be picked to generate blueprints first"}
@@ -99,10 +99,10 @@ function __create_outputs_frame(player_index, parent)
                                     priority[i] = swapped
                                     priority[i-1] = this
                                     -- sway gui
-                                    elem_of(parent_path.."|sprite_"..tostring(i),e.gui).sprite = sprite_of(swapped.name)
-                                    elem_of(parent_path.."|sprite_"..tostring(i-1),e.gui).sprite = sprite_of(this.name)
+                                    elem_of(path_of(priority_table).."|sprite_"..tostring(i),e.gui).sprite = sprite_of(swapped.name)
+                                    elem_of(path_of(priority_table).."|sprite_"..tostring(i-1),e.gui).sprite = sprite_of(this.name)
                                 end
-                            , {i=i, parent_path = path_of(priority_table)})
+                           )
                         end
 
                     local belt_label = vertical_flow.add{type = "label", name = "belt_label", caption="Belt Preference"}
@@ -134,21 +134,20 @@ function __create_input_buttons(player_index, gui_parent)
         register_gui_event_handler(player_index,left_button, defines.events.on_gui_click,
             function(e)
                 BlueprintGraph.use_ingredients_as_input(global.blueprint_graph[e.player_index], ingredient_name)
-                local gui_parent = elem_of(parent_path, e.gui)
                 unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
                 gui_parent.clear()
                 __create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
             end
-        , {parent_path = path_of(gui_parent), BlueprintGraph = BlueprintGraph})
+        )
         register_gui_event_handler(player_index,right_button, defines.events.on_gui_click,
             function(e)
                 BlueprintGraph.use_products_as_input(global.blueprint_graph[e.player_index], ingredient_name)
-                local gui_parent = elem_of(parent_path, e.gui)
+                local gui_parent = elem_of(path_of(gui_parent), e.gui)
                 unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
                 gui_parent.clear()
                 __create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
             end
-        , {parent_path = path_of(gui_parent), BlueprintGraph = BlueprintGraph})
+        )
     end
 end
 
@@ -174,7 +173,7 @@ function __create_inputs_frame(player_index, parent)
                 local item = game.players[e.player_index].get_main_inventory().find_item_stack("blueprint")
                 BlueprintGraph.generate_blueprint(global.blueprint_graph[e.player_index], e.player_index, item)
             end
-        ,{BlueprintGraph = BlueprintGraph})
+        )
 end
 
 function __update_input_frame(player_index)

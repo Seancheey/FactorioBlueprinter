@@ -9,7 +9,13 @@ guilib_listening_events = {
 }
 
 start_listening = false
+
+-- gui_handlers[player_index][event][gui_path] = handler
 gui_handlers = {}
+
+-- global_gui_handlers[event][gui_path] = handler
+global_gui_handlers = {}
+
 gui_refreshed = {}
 
 function __init_guilib_player_handler(player_index)
@@ -27,28 +33,41 @@ function guilib_start_listening_events()
     start_listening = true
 
     for _, event in ipairs(guilib_listening_events) do
+        global_gui_handlers[event] = global_gui_handlers[event] or {}
+    end
+
+    for _, event in ipairs(guilib_listening_events) do
         script.on_event(event, function(e)
-            debug_print("guilib event detected")
-            if not gui_handlers[e.player_index] or not gui_handlers[e.player_index][event] then
-                debug_print("ERROR: no gui_handlers for player")
-                return
-            end
-            for path, handle in pairs(gui_handlers[e.player_index][event]) do
-                e.gui = game.players[e.player_index].gui
-                if e.element.name == elem_of(path, e.gui).name then
-                    debug_print("handle found")
+            -- handle global events
+            for gui_path, handle in pairs(global_gui_handlers[event]) do
+                if e.element.name == gui_path then
                     handle(e)
                     return
                 end
             end
-            debug_print("guilib event failed to associate event to registered components")
+
+            if not gui_handlers[e.player_index] or not gui_handlers[e.player_index][event] then
+                debug_print("W: no gui_handlers for player")
+                return
+            end
+
+            -- handle player events
+            for path, handle in pairs(gui_handlers[e.player_index][event]) do
+                e.gui = game.players[e.player_index].gui
+                if e.element == elem_of(path, e.gui) then
+                    handle(e)
+                    return
+                end
+            end
+            debug_print("W: guilib event failed to associate event to registered components")
         end)
     end
 end
 
 -- helper function to easily register event handler
 function register_gui_event_handler(player_index, gui_elem, event, handler)
-    assert(player_index and gui_elem and event and type(handler) == "function", "missing parameter")
+    assertAllTruthy(player_index, gui_elem, event, handler)
+    assert(type(handler) == "function", "handler should be a function")
     assert(gui_elem.name ~= "", "gui's name can't be nil")
 
     __init_guilib_player_handler(player_index)
@@ -59,6 +78,13 @@ function register_gui_event_handler(player_index, gui_elem, event, handler)
     end
     --debug_print("registering "..gui_path)
     gui_handlers[player_index][event][gui_path] = handler
+end
+
+function register_global_gui_event_handler(gui_path, event, handler)
+    assertAllTruthy(gui_path, event, handler)
+
+    global_gui_handlers[event] = global_gui_handlers[event] or {}
+    global_gui_handlers[event][gui_path] = handler
 end
 
 function unregister_gui_event_handler(player_index, gui_elem, event)
@@ -107,6 +133,6 @@ function __elem_of_helper(path, gui, i)
 end
 
 function elem_of(path, gui)
-    assert(path and gui, "Found missing/nil parameter")
+    assertAllTruthy(path, gui)
     return __elem_of_helper(__path_split(path), gui, 1)
 end

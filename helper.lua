@@ -113,3 +113,11 @@ function sprite_of(name)
         return "fluid/"..name
     end
 end
+
+-- raise error if any value is nil or false
+-- note: 0 / "" will pass the assertion in lua
+function assertAllTruthy(...)
+    for i, v in ipairs({...}) do
+        assert(v, "ERROR: argument at position " .. i .. " is falsy.")
+    end
+end

@@ -34,21 +34,20 @@ script.on_event(defines.events.on_player_joined_game, function(e)
     init_player_mod(e.player_index)
 end)
 
-script.on_event(defines.events.on_gui_click, function(e)
+guilib_start_listening_events()
+
+register_global_gui_event_handler(main_button, defines.events.on_gui_click, function(e)
     parent = game.players[e.player_index].gui.left
-    if e.element.name == main_button then
-        if not parent[main_frame] then
-            debug_print("create")
-            guilib_start_listening_events()
-            __create_outputs_frame(e.player_index, parent)
-            __create_inputs_frame(e.player_index, parent)
-            parent[inputs_frame].visible = false
-        else
-            debug_print("destroy")
-            clear_gui_area(parent)
-        end
+    if not parent[main_frame] then
+        guilib_start_listening_events()
+        __create_outputs_frame(e.player_index, parent)
+        __create_inputs_frame(e.player_index, parent)
+        parent[inputs_frame].visible = false
+    else
+        clear_gui_area(parent)
     end
 end)
+
 
 script.on_configuration_changed(function(data)
     -- no configuration change should be needed for now
