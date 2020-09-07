@@ -36,7 +36,7 @@ script.on_init(function()
     end
 end)
 
---initialize blueprinter guis
+--initialize blue printer GUIs
 script.on_event(defines.events.on_player_joined_game,initialize_player_gui)
 
 script.on_configuration_changed(function(data)

@@ -54,8 +54,8 @@ function create_new_output_item_choice(parent, player_index)
             item_choice.crafting_speed = (e.element.text ~= "" and tonumber(e.element.text) or 0) / unit_values[item_choice.unit]
         end
     , {row_num = row_num})
-    local unitbox = parent.add{name = "bp_output_dropdown"..tostring(row_num), type = "drop-down", items = output_units, selected_index = 1}
-    register_gui_event_handler(player_index,unitbox, defines.events.on_gui_selection_state_changed,
+    local unit_box = parent.add{ name = "bp_output_dropdown"..tostring(row_num), type = "drop-down", items = output_units, selected_index = 1}
+    register_gui_event_handler(player_index, unit_box, defines.events.on_gui_selection_state_changed,
         function(e, global, env)
             local item_choice = global.blueprint_outputs[e.player_index][env.row_num]
             item_choice.unit = env.output_units[e.element.selected_index]
