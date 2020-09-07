@@ -1,43 +1,42 @@
 require("gui")
-function init_all_global(reset)
-    if reset or not global.blueprint_outputs then global.blueprint_outputs = {} end
-    if reset or not global.blueprint_inputs then global.blueprint_inputs = {} end
-    if reset or not global.blueprint_graph then global.blueprint_graph = {} end
-    if reset or not global.settings then global.settings = newtable{} end
+
+function reset_all_global()
+    global.blueprint_outputs = {}
+    global.blueprint_inputs = {}
+    global.blueprint_graph = {}
+    global.settings = newtable {}
 end
 
-function init_player_global(player_index)
-    init_all_global(false)
-    if not global.blueprint_outputs[player_index] then global.blueprint_outputs[player_index] = {} end
-    if not global.blueprint_inputs[player_index] then global.blueprint_inputs[player_index] = {} end
-    if not global.settings[player_index] then global.settings[player_index] = {
+function init_all_global()
+    global.blueprint_outputs = global.blueprint_outputs or {}
+    global.blueprint_inputs = global.blueprint_inputs or {}
+    global.blueprint_graph = global.blueprint_graph or {}
+    global.settings = global.settings or newtable {}
+end
+
+function init_player_mod(player_index)
+    init_all_global()
+    global.blueprint_outputs[player_index] = global.blueprint_outputs[player_index] or {}
+    global.blueprint_inputs[player_index] = global.blueprint_inputs[player_index] or {}
+    global.blueprint_graph[player_index] = global.blueprint_graph[player_index] or {}
+    global.settings[player_index] = global.settings[player_index] or {
         belt = 1,
         factory_priority = all_factories()
-    } end
-    if not global.blueprint_graph[player_index] then global.blueprint_graph[player_index] = {} end
-end
-
-function initialize_player_gui(e)
-    print("initilizing player gui")
-    init_player_global(e.player_index)
-    local player = game.players[e.player_index]
-    clear_mod_gui(player)
-    local button = create_blueprinter_button(e.player_index, player.gui.left)
-    local frame = create_outputs_frame(player.gui.left, e.player_index)
-    frame.visible = false
-    local in_frame =  create_inputs_frame(player.gui.left, e.player_index)
-    in_frame.visible = false
+    }
+    init_player_gui(player_index, nil)
 end
 
 script.on_init(function()
-    init_all_global(true)
-    for i, _ in pairs(game.players) do
-        initialize_player_gui{player_index=i}
+    reset_all_global()
+    for player_index, _ in pairs(game.players) do
+        init_player_mod(player_index)
     end
 end)
 
 --initialize blue printer GUIs
-script.on_event(defines.events.on_player_joined_game,initialize_player_gui)
+script.on_event(defines.events.on_player_joined_game, function(e)
+    init_player_mod(e.player_index)
+end)
 
 script.on_configuration_changed(function(data)
     debug_print("configuration changed, re-initialize blueprinter globals")

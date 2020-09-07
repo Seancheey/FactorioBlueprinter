@@ -7,16 +7,26 @@ inputs_frame = "bp-inputs-frame"
 unit_values = {["item/s"] = 1, ["item/min"] = 60}
 output_units = {"item/s", "item/min"}
 
--- clear all mod guis
-function clear_mod_gui(player)
+-- clear all mod guis in gui_area associated with this mod
+function clear_gui_area(gui_area)
     for _, to_remove in ipairs{main_button,main_frame,inputs_frame} do
-        if player.gui.left[to_remove] then
-            player.gui.left[to_remove].destroy()
+        if gui_area[to_remove] then
+            gui_area[to_remove].destroy()
         end
     end
 end
 
-function create_blueprinter_button(player_index, parent)
+-- initialize gui of player with player_index at gui_area
+-- @param gui_area optional, default to player's gui left side
+function init_player_gui(player_index, gui_area)
+    local player_gui_area = gui_area or game.players[player_index].gui.left
+    clear_gui_area(player_gui_area)
+    __create_blueprinter_button(player_index, player_gui_area)
+    __create_outputs_frame(player_index, player_gui_area)
+    __create_inputs_frame(player_index, player_gui_area)
+end
+
+function __create_blueprinter_button(player_index, parent)
     local button = parent.add{
         type = "button",
         tooltip = "Click to open Blueprinter.",
@@ -31,8 +41,7 @@ function create_blueprinter_button(player_index, parent)
     )
 end
 
-
-function create_new_output_item_choice(parent, player_index)
+function __create_new_output_item_choice(player_index, parent)
     local row_num = #global.blueprint_outputs[player_index] + 1
     global.blueprint_outputs[player_index][row_num] = {crafting_speed = 1, unit=output_units[1]}
     local choose_button = parent.add{name = "bp_output_choose_button"..tostring(row_num), type = "choose-elem-button", elem_type = "recipe"}
@@ -41,7 +50,7 @@ function create_new_output_item_choice(parent, player_index)
             global.blueprint_outputs[e.player_index][env.row_num].ingredient = e.element.elem_value
             -- expand table if full
             if env.newtable(global.blueprint_outputs[e.player_index]):all(function(x) return x.ingredient end) then
-                create_new_output_item_choice(elem_of(env.parent_path, e.gui), e.player_index)
+                __create_new_output_item_choice(e.player_index, elem_of(env.parent_path, e.gui))
             end
             -- any change to output makes next frame invisible
             e.gui.left[inputs_frame].visible = false
@@ -66,18 +75,18 @@ function create_new_output_item_choice(parent, player_index)
     , {row_num = row_num, output_units = output_units, unit_values=unit_values, field_path = path_of(numfield)})
 end
 
-function create_outputs_frame(parent, player_index)
+function __create_outputs_frame(player_index, parent)
     local frame = parent.add{type = "frame",name = main_frame,caption = "Blueprinter"}
         local tab_pane = frame.add{type = "tabbed-pane",name = "outputs_tab_pane", caption = "outputs",direction = "vertical"}
             local output_tab = tab_pane.add{type = "tab",name = "outputs_tab",caption = "outputs"}
             local output_flow = tab_pane.add{type = "flow", name = "output_flow", direction = "vertical"}
                 local output_table = output_flow.add{type = "table", name = "output_table", caption = "select output items",column_count = 3}
-                    create_new_output_item_choice(output_table, player_index)
+                    __create_new_output_item_choice(player_index, output_table)
                 local confirm_button = output_flow.add{name = "bp_output_confirm_button", type = "button", caption = "confirm"}
                 register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
                     function(e, global, env)
                         e.gui.left[env.inputs_frame].visible = true
-                        update_input_frame(e.player_index)
+                        __update_input_frame(e.player_index)
                     end
                 , {inputs_frame = inputs_frame})
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
@@ -123,10 +132,10 @@ function create_outputs_frame(parent, player_index)
             tab_pane.add_tab(output_tab, output_flow)
             tab_pane.add_tab(setting_tab, vertical_flow)
             tab_pane.selected_tab_index = 1
-    return frame
+    frame.visible = false
 end
 
-function create_input_buttons(player_index, gui_parent)
+function __create_input_buttons(player_index, gui_parent)
     for ingredient_name, node in pairs(global.blueprint_graph[player_index].inputs) do
         local left_button = gui_parent.add{type="sprite-button", name = "left_button_"..ingredient_name, sprite="utility/left_arrow", tooltip="use it's ingredient instead"}
         local ingredient_sprite = gui_parent.add{type="sprite", name = "sprite_"..ingredient_name, sprite=sprite_of(ingredient_name)}
@@ -137,7 +146,7 @@ function create_input_buttons(player_index, gui_parent)
                 local gui_parent = elem_of(env.parent_path, e.gui)
                 unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
                 gui_parent.clear()
-                create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
+                __create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
             end
         , {parent_path = path_of(gui_parent), BlueprintGraph = BlueprintGraph})
         register_gui_event_handler(player_index,right_button, defines.events.on_gui_click,
@@ -146,13 +155,13 @@ function create_input_buttons(player_index, gui_parent)
                 local gui_parent = elem_of(env.parent_path, e.gui)
                 unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
                 gui_parent.clear()
-                create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
+                __create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
             end
         , {parent_path = path_of(gui_parent), BlueprintGraph = BlueprintGraph})
     end
 end
 
-function create_inputs_frame(parent, player_index)
+function __create_inputs_frame(player_index, parent)
     local frame = parent.add{name = inputs_frame, type= "frame", caption = "Input Source Select", direction = "vertical"}
         local hori_flow = frame.add{type = "table", name = "hori_flow", column_count = 2}
             local input_select_frame = hori_flow.add{type = "frame", name = "input_select_frame", caption = "Input Items Select"}
@@ -175,10 +184,10 @@ function create_inputs_frame(parent, player_index)
                 BlueprintGraph.generate_blueprint(global.blueprint_graph[e.player_index], e.player_index, item)
             end
         ,{BlueprintGraph = BlueprintGraph})
-    return frame
+    frame.visible = false
 end
 
-function update_input_frame(player_index)
+function __update_input_frame(player_index)
     local graph = BlueprintGraph.new()
     global.blueprint_graph[player_index] = graph
 
@@ -194,5 +203,5 @@ function update_input_frame(player_index)
     local inputs_table = elem_of(global.inputs_table_path, gui)
     unregister_gui_children_event_handler(player_index, inputs_table, defines.events.on_gui_click)
     inputs_table.clear()
-    create_input_buttons(player_index, inputs_table, graph)
+    __create_input_buttons(player_index, inputs_table, graph)
 end
