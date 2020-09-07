@@ -34,17 +34,17 @@ script.on_event(defines.events.on_player_joined_game, function(e)
     init_player_mod(e.player_index)
 end)
 
-guilib_start_listening_events()
+start_listening_events()
 
 register_global_gui_event_handler(main_button, defines.events.on_gui_click, function(e)
     parent = game.players[e.player_index].gui.left
     if not parent[main_frame] then
-        guilib_start_listening_events()
+        start_listening_events()
         __create_outputs_frame(e.player_index, parent)
         __create_inputs_frame(e.player_index, parent)
         parent[inputs_frame].visible = false
     else
-        clear_gui_area(parent)
+        clear_gui_area(e.player_index, parent)
     end
 end)
 

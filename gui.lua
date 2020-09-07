@@ -8,10 +8,11 @@ unit_values = {["item/s"] = 1, ["item/min"] = 60}
 output_units = {"item/s", "item/min"}
 
 -- clear all mod guis in gui_area associated with this mod
-function clear_gui_area(gui_area)
+function clear_gui_area(player_index, gui_area)
     for _, to_remove in ipairs{main_frame,inputs_frame} do
         if gui_area[to_remove] then
             gui_area[to_remove].destroy()
+            unregister_all_handlers(player_index, gui_area)
         end
     end
 end
@@ -20,7 +21,7 @@ end
 -- @param gui_area optional, default to player's gui left side
 function init_player_gui(player_index, gui_area)
     local player_gui_area = gui_area or game.players[player_index].gui.left
-    clear_gui_area(player_gui_area)
+    clear_gui_area(player_index, player_gui_area)
     __create_blueprinter_button(player_index, player_gui_area)
 end
 

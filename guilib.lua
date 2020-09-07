@@ -25,7 +25,7 @@ function __init_guilib_player_handler(player_index)
     end
 end
 
-function guilib_start_listening_events()
+function start_listening_events()
     -- ensure this method is only called once
     if start_listening then
         return
@@ -73,7 +73,7 @@ function register_gui_event_handler(player_index, gui_elem, event, handler)
     __init_guilib_player_handler(player_index)
 
     gui_path = path_of(gui_elem)
-    for _, elem_name in pairs(__path_split(gui_path)) do
+    for _, elem_name in pairs(__split_path(gui_path)) do
         assert(elem_name ~= "", "there is an element in path of " .. gui_elem.name .. "without name")
     end
     --debug_print("registering "..gui_path)
@@ -98,7 +98,16 @@ function unregister_gui_children_event_handler(player_index, gui_parent, event)
     end
 end
 
--- returns the path of a gui element represented by a list in order of [elem_name, parent_name, ... , root_name]
+function unregister_all_handlers(player_index, gui_elem)
+    for _, event in pairs(guilib_listening_events) do
+        gui_handlers[player_index][event][path_of(gui_elem)] = nil
+    end
+    for _, child in pairs(gui_elem.children) do
+        unregister_all_handlers(player_index, child)
+    end
+end
+
+--returns the path of a gui element represented by "root_name|parent_name|my_name"
 function path_of(gui_elem)
     assert(gui_elem.name)
     if gui_elem.parent then
@@ -108,7 +117,8 @@ function path_of(gui_elem)
     end
 end
 
-function __path_split(str)
+-- returns the path of a gui element represented by a list in order of [elem_name, parent_name, ... , root_name]
+function __split_path(str)
     local t = {}
     for s in string.gmatch(str, "([^|]+)") do
         table.insert(t, s)
@@ -116,17 +126,18 @@ function __path_split(str)
     return t
 end
 
-function __elem_of_helper(path, gui, i)
-    if path[i] then
-        if path[i] == "left" or path[i] == "top" or path[i] == "center" then
-            return __elem_of_helper(path, gui[path[i]], i + 1)
+function __elem_of_helper(path_list, gui, i)
+    if path_list[i] then
+        if path_list[i] == "left" or path_list[i] == "top" or path_list[i] == "center" then
+            return __elem_of_helper(path_list, gui[path_list[i]], i + 1)
         end
         for _, child in ipairs(gui.children) do
-            if child.name and child.name == path[i] then
-                return __elem_of_helper(path, child, i + 1)
+            if child.name and child.name == path_list[i] then
+                return __elem_of_helper(path_list, child, i + 1)
             end
         end
-        assert(false, "path children is not found/invalid when finding " .. path[i])
+        debug_print("W: path children is not found/invalid when finding " .. path_list[i])
+        return nil
     else
         return gui
     end
@@ -134,5 +145,5 @@ end
 
 function elem_of(path, gui)
     assertAllTruthy(path, gui)
-    return __elem_of_helper(__path_split(path), gui, 1)
+    return __elem_of_helper(__split_path(path), gui, 1)
 end
