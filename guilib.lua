@@ -8,8 +8,6 @@ guilib_listening_events = {
     defines.events.on_gui_text_changed
 }
 
-start_listening = false
-
 -- gui_handlers[player_index][event][gui_path] = handler
 gui_handlers = {}
 
@@ -25,6 +23,7 @@ function __init_guilib_player_handler(player_index)
     end
 end
 
+-- start guilib listening, note that all events that the guilib listen to shall not be listened again
 function start_listening_events()
     -- ensure this method is only called once
     if start_listening then
@@ -64,7 +63,7 @@ function start_listening_events()
     end
 end
 
--- helper function to easily register event handler
+--- register a *handler* that handles *event* for gui element *gui_elem* of player with *player_index*
 function register_gui_event_handler(player_index, gui_elem, event, handler)
     assertAllTruthy(player_index, gui_elem, event, handler)
     assert(type(handler) == "function", "handler should be a function")
@@ -80,6 +79,8 @@ function register_gui_event_handler(player_index, gui_elem, event, handler)
     gui_handlers[player_index][event][gui_path] = handler
 end
 
+--- register a global handler for a certain event for gui element with gui_path
+--- this function is particularly useful for events handling on script loading stage, where no player is availiable
 function register_global_gui_event_handler(gui_path, event, handler)
     assertAllTruthy(gui_path, event, handler)
 
@@ -88,7 +89,8 @@ function register_global_gui_event_handler(gui_path, event, handler)
 end
 
 function unregister_gui_event_handler(player_index, gui_elem, event)
-    assert(gui_elem.name)
+    assertAllTruthy(player_index, gui_elem, event)
+
     gui_handlers[player_index][event][path_of(gui_elem)] = nil
 end
 
@@ -100,7 +102,9 @@ end
 
 function unregister_all_handlers(player_index, gui_elem)
     for _, event in pairs(guilib_listening_events) do
-        gui_handlers[player_index][event][path_of(gui_elem)] = nil
+        if gui_handlers[player_index] and gui_handlers[player_index][event] then
+            gui_handlers[player_index][event][path_of(gui_elem)] = nil
+        end
     end
     for _, child in pairs(gui_elem.children) do
         unregister_all_handlers(player_index, child)

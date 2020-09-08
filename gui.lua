@@ -22,11 +22,7 @@ end
 function init_player_gui(player_index, gui_area)
     local player_gui_area = gui_area or game.players[player_index].gui.left
     clear_gui_area(player_index, player_gui_area)
-    __create_blueprinter_button(player_index, player_gui_area)
-end
-
-function __create_blueprinter_button(player_index, parent)
-    local button = parent.add{
+    player_gui_area.add{
         type = "button",
         tooltip = "Click to open Blueprinter.",
         caption = "Blueprinter",
@@ -43,9 +39,9 @@ function __create_new_output_item_choice(player_index, parent)
             global.blueprint_outputs[e.player_index][row_num].ingredient = e.element.elem_value
             -- expand table if full
             if newtable(global.blueprint_outputs[e.player_index]):all(function(x) return x.ingredient end) then
-                __create_new_output_item_choice(e.player_index,parent)
+                __create_new_output_item_choice(e.player_index, parent)
             end
-            -- any change to output makes next frame invisible
+            -- any change to output makes input frame invisible
             e.gui.left[inputs_frame].visible = false
         end
     )
@@ -128,25 +124,25 @@ function __create_outputs_frame(player_index, parent)
 end
 
 function __create_input_buttons(player_index, gui_parent)
-    for ingredient_name, node in pairs(global.blueprint_graph[player_index].inputs) do
+    local function recreate_input_buttons()
+        unregister_gui_children_event_handler(player_index, gui_parent, defines.events.on_gui_click)
+        gui_parent.clear()
+        __create_input_buttons(player_index, gui_parent)
+    end
+    for ingredient_name, _ in pairs(global.blueprint_graph[player_index].inputs) do
         local left_button = gui_parent.add{type="sprite-button", name = "left_button_"..ingredient_name, sprite="utility/left_arrow", tooltip="use it's ingredient instead"}
         local ingredient_sprite = gui_parent.add{type="sprite", name = "sprite_"..ingredient_name, sprite=sprite_of(ingredient_name)}
         local right_button = gui_parent.add{type="sprite-button", name = "right_button_"..ingredient_name, sprite="utility/right_arrow", tooltip = "use it's targets instead"}
         register_gui_event_handler(player_index,left_button, defines.events.on_gui_click,
             function(e)
                 BlueprintGraph.use_ingredients_as_input(global.blueprint_graph[e.player_index], ingredient_name)
-                unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
-                gui_parent.clear()
-                __create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
+                recreate_input_buttons()
             end
         )
         register_gui_event_handler(player_index,right_button, defines.events.on_gui_click,
             function(e)
                 BlueprintGraph.use_products_as_input(global.blueprint_graph[e.player_index], ingredient_name)
-                local gui_parent = elem_of(path_of(gui_parent), e.gui)
-                unregister_gui_children_event_handler(e.player_index, gui_parent, defines.events.on_gui_click)
-                gui_parent.clear()
-                __create_input_buttons(player_index, gui_parent, global.blueprint_graph[e.player_index])
+                recreate_input_buttons()
             end
         )
     end
