@@ -2,9 +2,14 @@ require("gui")
 
 --- @alias player_index number
 
+
 -- initialize global data as empty if they are nil
 -- Note that global data cannot be metatable
 function init_all_global()
+    --- @class PlayerSetting
+    --- @field factory_priority string[]
+    --- @field belt number
+    --- @type table<player_index, PlayerSetting>
     global.settings = global.settings or {}
 end
 
