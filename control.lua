@@ -40,12 +40,12 @@ start_listening_events()
 
 register_global_gui_event_handler(main_button, defines.events.on_gui_click, function(e)
     parent = game.players[e.player_index].gui.left
-    if not parent[main_frame] then
-        __create_outputs_frame(e.player_index, parent)
-        __create_inputs_frame(e.player_index, parent)
-        parent[inputs_frame].visible = false
+    if not parent[outputs_select_frame] then
+        create_outputs_select_frame(e.player_index, parent)
+        create_inputs_select_frame(e.player_index, parent)
+        parent[inputs_select_frame].visible = false
     else
-        clear_gui_area(e.player_index, parent)
+        clear_additional_gui(e.player_index, parent)
     end
 end)
 

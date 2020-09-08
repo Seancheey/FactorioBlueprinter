@@ -9,15 +9,15 @@ require("guilib")
 --- @field ingredient string recipe name of specification
 
 main_button = "bp-main-button"
-main_frame = "bp-outputs-frame"
-inputs_frame = "bp-inputs-frame"
+outputs_select_frame = "bp-outputs-frame"
+inputs_select_frame = "bp-inputs-frame"
 unit_values = {["item/s"] = 1, ["item/min"] = 60}
 output_units = {"item/s", "item/min"}
 
 
 -- clear all mod guis in gui_area associated with this mod
-function clear_gui_area(player_index, gui_area)
-    for _, to_remove in ipairs{main_frame,inputs_frame} do
+function clear_additional_gui(player_index, gui_area)
+    for _, to_remove in ipairs{ outputs_select_frame, inputs_select_frame } do
         if gui_area[to_remove] then
             gui_area[to_remove].destroy()
             unregister_all_handlers(player_index, gui_area)
@@ -29,7 +29,7 @@ end
 --- @param gui_area, default to player's gui left side
 function init_player_gui(player_index, gui_area)
     local player_gui_area = gui_area or game.players[player_index].gui.left
-    clear_gui_area(player_index, player_gui_area)
+    clear_additional_gui(player_index, player_gui_area)
     player_gui_area.add{
         type = "button",
         tooltip = "Click to open Blueprinter.",
@@ -39,8 +39,7 @@ function init_player_gui(player_index, gui_area)
 end
 
 --- add a new output item selection box for player with *player_index* at *parent* gui element
---- @param preset_recipe string, optional, preset recipe name for the new item box
-function __add_output_item_selection_box(player_index, parent, preset_recipe)
+function __add_output_item_selection_box(player_index, parent)
     assertAllTruthy(player_index, parent)
 
     local row_num = #global.blueprint_outputs[player_index] + 1
@@ -54,7 +53,7 @@ function __add_output_item_selection_box(player_index, parent, preset_recipe)
                 __add_output_item_selection_box(e.player_index, parent)
             end
             -- any change to output makes input frame invisible
-            e.gui.left[inputs_frame].visible = false
+            e.gui.left[inputs_select_frame].visible = false
         end
     )
     local num_field = parent.add{ name = "bp_output_numfield"..tostring(row_num), type = "textfield", text = "1", numeric = true, allow_negative = false}
@@ -74,14 +73,13 @@ function __add_output_item_selection_box(player_index, parent, preset_recipe)
             num_field.text = tostring(new_num)
         end
     )
-    if preset_recipe then
-        choose_button.elem_value = preset_recipe
-    end
 end
 
-function __create_outputs_frame(player_index, parent)
+function create_outputs_select_frame(player_index, parent)
+    assertAllTruthy(player_index, parent)
+
     global.blueprint_outputs[player_index] = {}
-    local frame = parent.add{type = "frame",name = main_frame,caption = "Blueprinter"}
+    local frame = parent.add{ type = "frame", name = outputs_select_frame, caption = "Blueprinter"}
         local tab_pane = frame.add{type = "tabbed-pane",name = "outputs_tab_pane", caption = "outputs",direction = "vertical"}
             local output_tab = tab_pane.add{type = "tab",name = "outputs_tab",caption = "outputs"}
             local output_flow = tab_pane.add{type = "flow", name = "output_flow", direction = "vertical"}
@@ -90,7 +88,7 @@ function __create_outputs_frame(player_index, parent)
                 local confirm_button = output_flow.add{name = "bp_output_confirm_button", type = "button", caption = "confirm"}
                 register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
                     function(e)
-                        e.gui.left[inputs_frame].visible = true
+                        e.gui.left[inputs_select_frame].visible = true
                         __update_input_frame(e.player_index)
                     end
                 )
@@ -105,13 +103,13 @@ function __create_outputs_frame(player_index, parent)
                                 function(e)
                                     -- eliminate first button
                                     if i <= 1 then return end
-                                    -- sway global setting
+                                    -- swap global setting
                                     local priority = global.settings[e.player_index].factory_priority
                                     local this = priority[i]
                                     local swapped = priority[i-1]
                                     priority[i] = swapped
                                     priority[i-1] = this
-                                    -- sway gui
+                                    -- swap gui
                                     elem_of(path_of(priority_table).."|sprite_"..tostring(i),e.gui).sprite = sprite_of(swapped.name)
                                     elem_of(path_of(priority_table).."|sprite_"..tostring(i-1),e.gui).sprite = sprite_of(this.name)
                                 end
@@ -164,9 +162,8 @@ function __create_input_buttons(player_index, gui_parent)
     end
 end
 
-function __create_inputs_frame(player_index, parent)
-    local frame = parent.add{name = inputs_frame, type= "frame", caption = "Input Source Select", direction = "vertical"}
-
+function create_inputs_select_frame(player_index, parent)
+    local frame = parent.add{ name = inputs_select_frame, type= "frame", caption = "Input Source Select", direction = "vertical"}
         local hori_flow = frame.add{type = "table", name = "hori_flow", column_count = 2}
             local input_select_frame = hori_flow.add{type = "frame", name = "input_select_frame", caption = "Input Items Select"}
                 local inputs_flow = input_select_frame.add{type = "flow", name = "inputs_flow", direction = "vertical"}
