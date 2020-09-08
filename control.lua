@@ -6,12 +6,10 @@ require("gui")
 -- Note that global data cannot be metatable
 function init_all_global()
     --- @type table<player_index, BlueprintGraph> records player's blueprint graph
-    global.blueprint_graph = global.blueprint_graph or {}
     global.settings = global.settings or {}
 end
 
 function init_player_mod(player_index)
-    global.blueprint_graph[player_index] = global.blueprint_graph[player_index] or {}
     global.settings[player_index] = global.settings[player_index] or {
         belt = 1,
         factory_priority = all_factories()
@@ -38,8 +36,6 @@ start_listening_events()
 register_global_gui_event_handler(main_button, defines.events.on_gui_click, function(e)
     if not gui_root(e.player_index)[outputs_select_frame] then
         create_outputs_select_frame(e.player_index)
-        create_inputs_select_frame(e.player_index)
-        gui_root(e.player_index)[inputs_select_frame].visible = false
     else
         remove_gui(e.player_index, outputs_select_frame)
         remove_gui(e.player_index, inputs_select_frame)
