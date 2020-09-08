@@ -1,5 +1,7 @@
 require("helper")
 
+--- @class BlueprintGraph
+
 ALL_BELTS = {"transport-belt", "fast-transport-belt", "express-transport-belt"}
 INSERTER_SPEEDS = {
     ["burner-inserter"] = 0.6,

@@ -1,11 +1,19 @@
 require("helper")
 require("blueprint_gen")
 require("guilib")
+
+
+--- @class OutputSpec one blueprint output specification
+--- @field crafting_speed number speed
+--- @field unit number crafting speed unit multiplier, with item/s as 1
+--- @field ingredient string recipe name of specification
+
 main_button = "bp-main-button"
 main_frame = "bp-outputs-frame"
 inputs_frame = "bp-inputs-frame"
 unit_values = {["item/s"] = 1, ["item/min"] = 60}
 output_units = {"item/s", "item/min"}
+
 
 -- clear all mod guis in gui_area associated with this mod
 function clear_gui_area(player_index, gui_area)
@@ -17,8 +25,8 @@ function clear_gui_area(player_index, gui_area)
     end
 end
 
--- initialize gui of player with player_index at gui_area
--- @param gui_area optional, default to player's gui left side
+--- initialize gui of player with player_index at gui_area
+--- @param gui_area, default to player's gui left side
 function init_player_gui(player_index, gui_area)
     local player_gui_area = gui_area or game.players[player_index].gui.left
     clear_gui_area(player_index, player_gui_area)
@@ -30,7 +38,11 @@ function init_player_gui(player_index, gui_area)
     }
 end
 
-function __create_new_output_item_choice(player_index, parent)
+--- add a new output item selection box for player with *player_index* at *parent* gui element
+--- @param preset_recipe string, optional, preset recipe name for the new item box
+function __add_output_item_selection_box(player_index, parent, preset_recipe)
+    assertAllTruthy(player_index, parent)
+
     local row_num = #global.blueprint_outputs[player_index] + 1
     global.blueprint_outputs[player_index][row_num] = {crafting_speed = 1, unit=output_units[1]}
     local choose_button = parent.add{name = "bp_output_choose_button"..tostring(row_num), type = "choose-elem-button", elem_type = "recipe"}
@@ -39,7 +51,7 @@ function __create_new_output_item_choice(player_index, parent)
             global.blueprint_outputs[e.player_index][row_num].ingredient = e.element.elem_value
             -- expand table if full
             if newtable(global.blueprint_outputs[e.player_index]):all(function(x) return x.ingredient end) then
-                __create_new_output_item_choice(e.player_index, parent)
+                __add_output_item_selection_box(e.player_index, parent)
             end
             -- any change to output makes input frame invisible
             e.gui.left[inputs_frame].visible = false
@@ -62,15 +74,19 @@ function __create_new_output_item_choice(player_index, parent)
             num_field.text = tostring(new_num)
         end
     )
+    if preset_recipe then
+        choose_button.elem_value = preset_recipe
+    end
 end
 
 function __create_outputs_frame(player_index, parent)
+    global.blueprint_outputs[player_index] = {}
     local frame = parent.add{type = "frame",name = main_frame,caption = "Blueprinter"}
         local tab_pane = frame.add{type = "tabbed-pane",name = "outputs_tab_pane", caption = "outputs",direction = "vertical"}
             local output_tab = tab_pane.add{type = "tab",name = "outputs_tab",caption = "outputs"}
             local output_flow = tab_pane.add{type = "flow", name = "output_flow", direction = "vertical"}
                 local output_table = output_flow.add{type = "table", name = "output_table", caption = "select output items",column_count = 3}
-                    __create_new_output_item_choice(player_index, output_table)
+                    __add_output_item_selection_box(player_index, output_table)
                 local confirm_button = output_flow.add{name = "bp_output_confirm_button", type = "button", caption = "confirm"}
                 register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
                     function(e)
@@ -150,6 +166,7 @@ end
 
 function __create_inputs_frame(player_index, parent)
     local frame = parent.add{name = inputs_frame, type= "frame", caption = "Input Source Select", direction = "vertical"}
+
         local hori_flow = frame.add{type = "table", name = "hori_flow", column_count = 2}
             local input_select_frame = hori_flow.add{type = "frame", name = "input_select_frame", caption = "Input Items Select"}
                 local inputs_flow = input_select_frame.add{type = "flow", name = "inputs_flow", direction = "vertical"}
