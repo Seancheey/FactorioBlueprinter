@@ -14,8 +14,6 @@ gui_handlers = {}
 -- global_gui_handlers[event][gui_path] = handler
 global_gui_handlers = {}
 
-gui_refreshed = {}
-
 function __init_guilib_player_handler(player_index)
     gui_handlers[player_index] = gui_handlers[player_index] or {}
     for _, event in ipairs(guilib_listening_events) do
@@ -100,6 +98,7 @@ function unregister_gui_children_event_handler(player_index, gui_parent, event)
     end
 end
 
+--- unregister all handlers of gui_elem and its children
 function unregister_all_handlers(player_index, gui_elem)
     for _, event in pairs(guilib_listening_events) do
         if gui_handlers[player_index] and gui_handlers[player_index][event] then
@@ -109,6 +108,13 @@ function unregister_all_handlers(player_index, gui_elem)
     for _, child in pairs(gui_elem.children) do
         unregister_all_handlers(player_index, child)
     end
+end
+
+--- @return any root gui of player for this mod
+function gui_root(player_index)
+    assertAllTruthy(player_index)
+
+    return game.players[player_index].gui.left
 end
 
 --returns the path of a gui element represented by "root_name|parent_name|my_name"

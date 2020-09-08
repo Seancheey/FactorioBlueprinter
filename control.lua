@@ -16,7 +16,7 @@ function init_player_mod(player_index)
         belt = 1,
         factory_priority = all_factories()
     }
-    init_player_gui(player_index, nil)
+    init_player_gui(player_index)
 end
 
 
@@ -36,17 +36,11 @@ end)
 start_listening_events()
 
 register_global_gui_event_handler(main_button, defines.events.on_gui_click, function(e)
-    parent = game.players[e.player_index].gui.left
-    if not parent[outputs_select_frame] then
-        create_outputs_select_frame(e.player_index, parent)
-        create_inputs_select_frame(e.player_index, parent)
-        parent[inputs_select_frame].visible = false
+    if not gui_root(e.player_index)[outputs_select_frame] then
+        create_outputs_select_frame(e.player_index)
+        create_inputs_select_frame(e.player_index)
+        gui_root(e.player_index)[inputs_select_frame].visible = false
     else
-        clear_additional_gui(e.player_index, parent)
+        clear_additional_gui(e.player_index)
     end
-end)
-
-
-script.on_configuration_changed(function(data)
-    -- no configuration change should be needed for now
 end)
