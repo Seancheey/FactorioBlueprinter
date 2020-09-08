@@ -5,15 +5,12 @@ require("gui")
 -- initialize global data as empty if they are nil
 -- Note that global data cannot be metatable
 function init_all_global()
-    --- @type table<player_index, OutputSpec[]> records player's specified outputs
-    global.blueprint_outputs = global.blueprint_outputs or {}
     --- @type table<player_index, BlueprintGraph> records player's blueprint graph
     global.blueprint_graph = global.blueprint_graph or {}
     global.settings = global.settings or {}
 end
 
 function init_player_mod(player_index)
-    global.blueprint_outputs[player_index] = global.blueprint_outputs[player_index] or {}
     global.blueprint_graph[player_index] = global.blueprint_graph[player_index] or {}
     global.settings[player_index] = global.settings[player_index] or {
         belt = 1,

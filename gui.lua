@@ -39,18 +39,18 @@ function init_player_gui(player_index, gui_area)
 end
 
 --- add a new output item selection box for player with *player_index* at *parent* gui element
-function __add_output_item_selection_box(player_index, parent)
-    assertAllTruthy(player_index, parent)
+function __add_output_item_selection_box(player_index, parent, outputs_specifications)
+    assertAllTruthy(player_index, parent, outputs_specifications)
 
-    local row_num = #global.blueprint_outputs[player_index] + 1
-    global.blueprint_outputs[player_index][row_num] = {crafting_speed = 1, unit=output_units[1]}
+    local row_num = #outputs_specifications + 1
+    outputs_specifications[row_num] = { crafting_speed = 1, unit=output_units[1]}
     local choose_button = parent.add{name = "bp_output_choose_button"..tostring(row_num), type = "choose-elem-button", elem_type = "recipe"}
     register_gui_event_handler(player_index,choose_button, defines.events.on_gui_elem_changed,
         function(e)
-            global.blueprint_outputs[e.player_index][row_num].ingredient = e.element.elem_value
+            outputs_specifications[row_num].ingredient = e.element.elem_value
             -- expand table if full
-            if newtable(global.blueprint_outputs[e.player_index]):all(function(x) return x.ingredient end) then
-                __add_output_item_selection_box(e.player_index, parent)
+            if outputs_specifications:all(function(x) return x.ingredient end) then
+                __add_output_item_selection_box(e.player_index, parent, outputs_specifications)
             end
             -- any change to output makes input frame invisible
             e.gui.left[inputs_select_frame].visible = false
@@ -59,14 +59,14 @@ function __add_output_item_selection_box(player_index, parent)
     local num_field = parent.add{ name = "bp_output_numfield"..tostring(row_num), type = "textfield", text = "1", numeric = true, allow_negative = false}
     register_gui_event_handler(player_index, num_field, defines.events.on_gui_text_changed,
         function(e)
-            local item_choice = global.blueprint_outputs[e.player_index][row_num]
+            local item_choice = outputs_specifications[row_num]
             item_choice.crafting_speed = (e.element.text ~= "" and tonumber(e.element.text) or 0) / unit_values[item_choice.unit]
         end
     )
     local unit_box = parent.add{ name = "bp_output_dropdown"..tostring(row_num), type = "drop-down", items = output_units, selected_index = 1}
     register_gui_event_handler(player_index, unit_box, defines.events.on_gui_selection_state_changed,
         function(e)
-            local item_choice = global.blueprint_outputs[e.player_index][row_num]
+            local item_choice = outputs_specifications[row_num]
             item_choice.unit = output_units[e.element.selected_index]
             -- recalculate item crafting speed according to new unit
             local new_num = item_choice.crafting_speed*unit_values[item_choice.unit]
@@ -78,18 +78,19 @@ end
 function create_outputs_select_frame(player_index, parent)
     assertAllTruthy(player_index, parent)
 
-    global.blueprint_outputs[player_index] = {}
+    --- @type OutputSpec[]
+    local output_specifications = newtable{}
     local frame = parent.add{ type = "frame", name = outputs_select_frame, caption = "Blueprinter"}
         local tab_pane = frame.add{type = "tabbed-pane",name = "outputs_tab_pane", caption = "outputs",direction = "vertical"}
             local output_tab = tab_pane.add{type = "tab",name = "outputs_tab",caption = "outputs"}
             local output_flow = tab_pane.add{type = "flow", name = "output_flow", direction = "vertical"}
                 local output_table = output_flow.add{type = "table", name = "output_table", caption = "select output items",column_count = 3}
-                    __add_output_item_selection_box(player_index, output_table)
+                    __add_output_item_selection_box(player_index, output_table, output_specifications)
                 local confirm_button = output_flow.add{name = "bp_output_confirm_button", type = "button", caption = "confirm"}
                 register_gui_event_handler(player_index,confirm_button, defines.events.on_gui_click,
                     function(e)
                         e.gui.left[inputs_select_frame].visible = true
-                        __update_input_frame(e.player_index)
+                        __update_input_frame(e.player_index, output_specifications)
                     end
                 )
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
@@ -187,11 +188,12 @@ function create_inputs_select_frame(player_index, parent)
         )
 end
 
-function __update_input_frame(player_index)
+function __update_input_frame(player_index, output_specs)
+    assertAllTruthy(player_index, output_specs)
     local graph = BlueprintGraph.new()
     global.blueprint_graph[player_index] = graph
 
-    graph:generate_graph_by_outputs(global.blueprint_outputs[player_index])
+    graph:generate_graph_by_outputs(output_specs)
     local gui = game.players[player_index].gui
     -- update outputs view
     elem_of(global.output_view_path, gui).clear()
