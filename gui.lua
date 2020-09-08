@@ -14,23 +14,33 @@ inputs_select_frame = "bp-inputs-frame"
 unit_values = {["item/s"] = 1, ["item/min"] = 60}
 output_units = {"item/s", "item/min"}
 
---- clear all mod guis in gui_area associated with this mod
-function clear_additional_gui(player_index)
-    assertAllTruthy(player_index)
+--- clear gui and its children as well as unregister all it's handlers
+--- @param gui_name string gui element name
+function remove_gui(player_index, gui_name)
+    assertAllTruthy(player_index, gui_name)
 
-    for _, to_remove in ipairs{ outputs_select_frame, inputs_select_frame } do
-        if gui_root(player_index)[to_remove] then
-            gui_root(player_index)[to_remove].destroy()
-            unregister_all_handlers(player_index, gui_root(player_index))
-        end
+    if gui_root(player_index)[gui_name] then
+        unregister_all_handlers(player_index, gui_root(player_index))
+        gui_root(player_index)[gui_name].destroy()
     end
+end
+
+function remove_all_gui_children(player_index, gui_elem)
+    assertAllTruthy(player_index, gui_elem)
+
+    for _, child in ipairs(gui_elem.children) do
+        unregister_all_handlers(player_index, child)
+    end
+    gui_elem.clear()
 end
 
 --- initialize gui of player with player_index at gui_area
 function init_player_gui(player_index)
     assertAllTruthy(player_index)
 
-    clear_additional_gui(player_index)
+    remove_gui(player_index, outputs_select_frame)
+    remove_gui(player_index, inputs_select_frame)
+
     gui_root(player_index).add{
         type = "button",
         tooltip = "Click to open Blueprinter.",
@@ -142,8 +152,7 @@ end
 
 function __create_input_buttons(player_index, gui_parent)
     local function recreate_input_buttons()
-        unregister_gui_children_event_handler(player_index, gui_parent, defines.events.on_gui_click)
-        gui_parent.clear()
+        remove_all_gui_children(player_index, gui_parent)
         __create_input_buttons(player_index, gui_parent)
     end
     for ingredient_name, _ in pairs(global.blueprint_graph[player_index].inputs) do
@@ -205,7 +214,6 @@ function __update_input_frame(player_index, output_specs)
 
     -- update inputs view
     local inputs_table = elem_of(global.inputs_table_path, gui)
-    unregister_gui_children_event_handler(player_index, inputs_table, defines.events.on_gui_click)
-    inputs_table.clear()
+    remove_all_gui_children(player_index, inputs_table)
     __create_input_buttons(player_index, inputs_table, graph)
 end

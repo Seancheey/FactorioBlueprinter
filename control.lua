@@ -41,6 +41,7 @@ register_global_gui_event_handler(main_button, defines.events.on_gui_click, func
         create_inputs_select_frame(e.player_index)
         gui_root(e.player_index)[inputs_select_frame].visible = false
     else
-        clear_additional_gui(e.player_index)
+        remove_gui(e.player_index, outputs_select_frame)
+        remove_gui(e.player_index, inputs_select_frame)
     end
 end)
