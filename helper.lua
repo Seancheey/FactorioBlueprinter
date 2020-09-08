@@ -5,15 +5,20 @@ function debug_print(msg, player_index)
     end
 end
 
+--- @class HelperTable
+
+--- @type HelperTable
 Table = {}
 Table.__index = Table
 
+--- @return HelperTable
 function newtable(table)
     out = table or {}
     setmetatable(out,Table)
     return out
 end
 
+--- @return HelperTable
 function Table:keys()
     assert(self)
     local keyset = newtable()
@@ -25,6 +30,7 @@ function Table:keys()
     return keyset
 end
 
+--- @return HelperTable
 function Table:values()
     assert(self)
     local valset = newtable()
@@ -36,6 +42,8 @@ function Table:values()
     return valset
 end
 
+--- @param val any
+--- @return boolean
 function Table:has(val)
     assert(self and val)
     for _, test in pairs(self) do
@@ -46,6 +54,8 @@ function Table:has(val)
     return false
 end
 
+--- @param f function(ele: any):any
+--- @return HelperTable
 function Table:map(f)
     assert(self and f)
     out = newtable{}
@@ -55,6 +65,8 @@ function Table:map(f)
     return out
 end
 
+--- @param f function(ele: any):boolean
+--- @return HelperTable
 function Table:filter(f)
     assert(self and f)
     out = newtable{}
@@ -66,6 +78,8 @@ function Table:filter(f)
     return out
 end
 
+--- @param f function(ele: any):boolean
+--- @return boolean
 function Table:all(f)
     f = f or function(x) return x end
     assert(self and f)
@@ -77,6 +91,8 @@ function Table:all(f)
     return true
 end
 
+--- @param f function(ele: any):boolean
+--- @return boolean
 function Table:any(f)
     f = f or function(x) return x end
     assert(self and f)
