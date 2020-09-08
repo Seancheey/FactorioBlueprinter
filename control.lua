@@ -5,7 +5,6 @@ require("gui")
 -- initialize global data as empty if they are nil
 -- Note that global data cannot be metatable
 function init_all_global()
-    --- @type table<player_index, BlueprintGraph> records player's blueprint graph
     global.settings = global.settings or {}
 end
 

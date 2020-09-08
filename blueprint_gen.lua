@@ -1,6 +1,8 @@
 require("helper")
 
---- @class BlueprintGraph
+--- @alias recipe_name string
+--- @alias ingredient_name string
+
 
 ALL_BELTS = {"transport-belt", "fast-transport-belt", "express-transport-belt"}
 INSERTER_SPEEDS = {
@@ -53,19 +55,22 @@ function preferred_belt(player_index)
     return ALL_BELTS[global.settings[player_index].belt]
 end
 
+--- @class AssemblerNode represent a group of assemblers for crafting a single recipe
+--- @field recipe recipe_name
+--- @field recipe_speed number how fast the recipe should be done per second
+--- @field targets table<ingredient_name, AssemblerNode> target assemblers that outputs are delivered to
+--- @field sources table<ingredient_name, AssemblerNode> assemblers that inputs are received from
 AssemblerNode = {}
--- AssemblerNode class inherents Table class
+
+-- AssemblerNode class inherent Table class
 function AssemblerNode.__index (t,k)
     return AssemblerNode[k] or Table[k] or t.recipe[k]
 end
 
 function AssemblerNode.new(o)
     assert(o.recipe)
-    -- how fast the recipe should be done per sec
     o.recipe_speed = o.recipe_speed or 0
-    -- target assembers that outputs are delivered to, in format of ingredient->node
     o.targets = o.targets or newtable{}
-    -- source assembers that inputs are received from, in format of ingredient->node
     o.sources = o.sources or newtable{}
     setmetatable(o,AssemblerNode)
     return o
@@ -167,6 +172,11 @@ function AssemblerNode:generate_blueprint(player_index, item, eid, xoff, yoff)
     --return {inputs={ingre1={{x=1,y=2},{x=6,y=8}, ingre2={{x=1,y=2}}}, outputs={...}, width=, height=}
 end
 
+
+--- @class BlueprintGraph
+--- @field inputs table<ingredient_name, AssemblerNode> input ingredients
+--- @field outputs table<ingredient_name, AssemblerNode> output ingredients
+--- @field dict table<recipe_name, AssemblerNode> all assembler nodes
 BlueprintGraph = {}
 function BlueprintGraph.__index(t, k)
     return BlueprintGraph[k] or Table[k] or t.dict[k]
@@ -174,11 +184,9 @@ end
 
 function BlueprintGraph.new(o)
     o = o or {}
-    -- input ingredients, in format of: ingredient name -> assembler node
+    --- @type table<string, AssemblerNode> input ingredients
     o.inputs = o.inputs or newtable{}
-    -- output products, in format of: product name -> assembler node
     o.outputs = o.outputs or newtable{}
-    -- all assember nodes, in format of recipe name -> assembler node
     o.dict = o.dict or newtable{}
     setmetatable(o, BlueprintGraph)
     return o
@@ -188,12 +196,12 @@ function BlueprintGraph:generate_graph_by_outputs(requirements)
     if is_final == nil then is_final = true end
     for _, requirement in ipairs(requirements) do
         if requirement.ingredient and requirement.crafting_speed then
-            self:generate_assember(requirement.ingredient,requirement.crafting_speed, true)
+            self:generate_assembler(requirement.ingredient,requirement.crafting_speed, true)
         end
     end
 end
 
-function BlueprintGraph:generate_assember(recipe_name, crafting_speed, is_final)
+function BlueprintGraph:generate_assembler(recipe_name, crafting_speed, is_final)
     assert(self and recipe_name and crafting_speed and (is_final ~= nil))
     local recipe = game.recipe_prototypes[recipe_name]
     if recipe then
@@ -219,7 +227,7 @@ function BlueprintGraph:generate_assember(recipe_name, crafting_speed, is_final)
         for _, ingredient in ipairs(node.ingredients) do
             child_recipe = game.recipe_prototypes[ingredient.name]
             if child_recipe then
-                local child = self:generate_assember(child_recipe.name,ingredient.amount * new_speed,false)
+                local child = self:generate_assembler(child_recipe.name,ingredient.amount * new_speed,false)
                 node.sources[ingredient.name] = child
                 child.targets[recipe_name] = node
             else
@@ -232,7 +240,7 @@ function BlueprintGraph:generate_assember(recipe_name, crafting_speed, is_final)
     end
 end
 
-function BlueprintGraph:assembers_whose_products_have(item_name)
+function BlueprintGraph:assemblers_whose_products_have(item_name)
     if self[item_name] then return newtable{self[item_name]} end
     local out = newtable{}
     for _, node in pairs(self.dict) do
@@ -246,7 +254,7 @@ function BlueprintGraph:assembers_whose_products_have(item_name)
     return out
 end
 
-function BlueprintGraph:assembers_whose_ingredients_have(item_name)
+function BlueprintGraph:assemblers_whose_ingredients_have(item_name)
     assert(self and item_name)
     local out = newtable{}
     if self[item_name] then
@@ -274,7 +282,7 @@ function BlueprintGraph:ingredient_fully_used_by(ingredient_name, item_list)
         return true
     end
     products = newtable{}
-    for _, node in ipairs(self:assembers_whose_ingredients_have(ingredient_name)) do
+    for _, node in ipairs(self:assemblers_whose_ingredients_have(ingredient_name)) do
         for _, p in ipairs(node.products) do
             products[#products+1] = p.name
         end
@@ -286,7 +294,7 @@ end
 function BlueprintGraph:use_products_as_input(item_name)
     self.__index = BlueprintGraph.__index
     setmetatable(self, self)
-    nodes = self:assembers_whose_ingredients_have(item_name)
+    nodes = self:assemblers_whose_ingredients_have(item_name)
     if nodes:any(function(x) return self.outputs:has(x) end) then
         debug_print("ingredient can't be more advanced")
         return
@@ -295,7 +303,7 @@ function BlueprintGraph:use_products_as_input(item_name)
     self.inputs[item_name] = nil
     for _, node in pairs(nodes) do
         for _, product in ipairs(node.products) do
-            for _, target in pairs(self:assembers_whose_ingredients_have(product.name)) do
+            for _, target in pairs(self:assemblers_whose_ingredients_have(product.name)) do
                 self.inputs[product.name] = target
             end
         end
@@ -321,7 +329,7 @@ function BlueprintGraph:use_ingredients_as_input(item_name)
     self.__index = BlueprintGraph.__index
     setmetatable(self, self)
     local viable = false
-    for _, node in pairs(self:assembers_whose_products_have(item_name)) do
+    for _, node in pairs(self:assemblers_whose_products_have(item_name)) do
         for _, ingredient in pairs(node.ingredients) do
             self.inputs[ingredient.name] = node
             viable = true
