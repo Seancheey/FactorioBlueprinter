@@ -1,8 +1,23 @@
 require("helper")
 
+--- @alias recipe_prototype any
 --- @alias recipe_name string
 --- @alias ingredient_name string
 
+--- @class Coordinate
+--- @field x number
+--- @field y number
+
+--- @class Entity
+--- @field entity_number number unique identifier of entity
+--- @field name string entity name
+--- @field position Coordinate
+--- @field direction any defines.direction.east/south/west/north
+
+--- @class BlueprintSection
+--- @field entities Entity[]
+--- @field inlets Entity[] each element is one of entities
+--- @field outlets Entity[] each element is one of entities
 
 ALL_BELTS = {"transport-belt", "fast-transport-belt", "express-transport-belt"}
 INSERTER_SPEEDS = {
@@ -38,8 +53,8 @@ end
 
 function preferred_factory_of_recipe(recipe_name, player_index)
     for _, factory in ipairs(global.settings[player_index].factory_priority) do
-        for _, avaliable in ipairs(factories_of_recipe(recipe_name)) do
-            if factory == avaliable then
+        for _, available in ipairs(factories_of_recipe(recipe_name)) do
+            if factory == available then
                 return factory
             end
         end
@@ -56,10 +71,12 @@ function preferred_belt(player_index)
 end
 
 --- @class AssemblerNode represent a group of assemblers for crafting a single recipe
---- @field recipe recipe_name
+--- @field recipe recipe_prototype
 --- @field recipe_speed number how fast the recipe should be done per second
 --- @field targets table<ingredient_name, AssemblerNode> target assemblers that outputs are delivered to
 --- @field sources table<ingredient_name, AssemblerNode> assemblers that inputs are received from
+--- @field player_index player_index
+--- @type AssemblerNode
 AssemblerNode = {}
 
 -- AssemblerNode class inherent Table class
@@ -68,7 +85,7 @@ function AssemblerNode.__index (t,k)
 end
 
 function AssemblerNode.new(o)
-    assert(o.recipe)
+    assert(o.recipe and o.player_index)
     o.recipe_speed = o.recipe_speed or 0
     o.targets = o.targets or newtable{}
     o.sources = o.sources or newtable{}
@@ -142,12 +159,8 @@ function create_crafting_unit(entities, recipe_name, factory_name, belt_name, xo
     return belt_positions, factory_off
 end
 
-function create_crafting_row_units(blueprint_item, recipe_name, factory_name, unit_num_in_row, belt_name, xoff, yoff, eid)
-
-end
-
 function AssemblerNode:tostring()
-    return "{"..self.name.."  sources:"..self.sources:keys():tostring()..", targets:"..self.targets:keys():tostring().."}"
+    return "{"..self.recipe.."  sources:"..self.sources:keys():tostring()..", targets:"..self.targets:keys():tostring().."}"
 end
 
 function AssemblerNode:generate_blueprint(player_index, item, eid, xoff, yoff)
@@ -172,22 +185,46 @@ function AssemblerNode:generate_blueprint(player_index, item, eid, xoff, yoff)
     --return {inputs={ingre1={{x=1,y=2},{x=6,y=8}, ingre2={{x=1,y=2}}}, outputs={...}, width=, height=}
 end
 
+--- get a crafting machine prototype that user preferred
+--- @return any crafting machine prototype
+function AssemblerNode:get_crafting_machine_prototype()
+    -- get all crafting machines
+    local filter = {filter="crafting-machine"}
+    local crafting_machines = game.get_filtered_entity_prototypes({filter})
+    -- get recipe category
+    local recipe_category = self.recipe.category
+    -- match category
+    local matching_prototypes = newtable(crafting_machines):filter(function (prototype)
+        return newtable(prototype.crafting_categories):has(recipe_category)
+    end)
+    -- select first preferred
+    for _, crafting_machine in ipairs(global.settings[self.player_index].factory_priority) do
+        for _, matching_prototype in ipairs(matching_prototypes) do
+            if crafting_machine == matching_prototype.name then
+                return matching_prototype
+            end
+        end
+    end
+end
+
 
 --- @class BlueprintGraph
 --- @field inputs table<ingredient_name, AssemblerNode> input ingredients
 --- @field outputs table<ingredient_name, AssemblerNode> output ingredients
 --- @field dict table<recipe_name, AssemblerNode> all assembler nodes
+--- @field player_index player_index
 BlueprintGraph = {}
 function BlueprintGraph.__index(t, k)
     return BlueprintGraph[k] or Table[k] or t.dict[k]
 end
 
-function BlueprintGraph.new(o)
-    o = o or {}
-    --- @type table<string, AssemblerNode> input ingredients
-    o.inputs = o.inputs or newtable{}
-    o.outputs = o.outputs or newtable{}
-    o.dict = o.dict or newtable{}
+
+--- @return BlueprintGraph
+function BlueprintGraph.new(player_index)
+    o = {player_index = player_index}
+    o.inputs = newtable{}
+    o.outputs = newtable{}
+    o.dict = newtable{}
     setmetatable(o, BlueprintGraph)
     return o
 end
@@ -206,7 +243,7 @@ function BlueprintGraph:generate_assembler(recipe_name, crafting_speed, is_final
     local recipe = game.recipe_prototypes[recipe_name]
     if recipe then
         -- setup current node
-        self.dict[recipe_name] = self.dict[recipe_name] or AssemblerNode.new{recipe=recipe}
+        self.dict[recipe_name] = self.dict[recipe_name] or AssemblerNode.new{recipe=recipe, player_index=self.player_index}
         local node = self.dict[recipe_name]
         if is_final then
             for _, product in ipairs(node.products) do
@@ -214,7 +251,7 @@ function BlueprintGraph:generate_assembler(recipe_name, crafting_speed, is_final
                 self.outputs[product.name] = node
             end
         end
-        local new_speed = nil
+        local new_speed
         for _, product in ipairs(node.products) do
             if product.name == recipe_name then
                 new_speed = crafting_speed / product.amount
@@ -309,7 +346,7 @@ function BlueprintGraph:use_products_as_input(item_name)
         end
     end
 
-    -- remove unecessary input sources that are fully covered by other sources
+    -- remove unnecessary input sources that are fully covered by other sources
     local others = self.inputs:shallow_copy()
     local to_remove = {}
     for input_name, input_node in pairs(self.inputs) do
@@ -353,12 +390,11 @@ function BlueprintGraph:tostring(nodes, indent)
     return out:sub(1,-2)
 end
 
-function BlueprintGraph:generate_blueprint(player_index, item)
-    local eid = 1
+function BlueprintGraph:generate_blueprint()
+    -- insert a new item into player's inventory
+    game.players[self.player_index].insert("blueprint")
+    local item = game.players[self.player_index].get_main_inventory().find_item_stack("blueprint")
     local entities={}
-    create_crafting_unit(entities, "inserter", factories_of_recipe("inserter")[1].name, preferred_belt(player_index), 0, 0)
+    create_crafting_unit(entities, "inserter", factories_of_recipe("inserter")[1].name, preferred_belt(self.player_index), 0, 0)
     item.set_blueprint_entities(entities)
-end
-
-function BlueprintGraph:generate_entities()
 end

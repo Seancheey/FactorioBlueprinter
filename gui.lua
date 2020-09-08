@@ -153,7 +153,7 @@ end
 
 function create_inputs_select_frame(player_index, output_specs)
     assertAllTruthy(player_index, output_specs)
-    local blueprint_graph = BlueprintGraph.new()
+    local blueprint_graph = BlueprintGraph.new(player_index)
     blueprint_graph:generate_graph_by_outputs(output_specs)
     local frame = gui_root(player_index).add{ name = inputs_select_frame, type= "frame", caption = "Input Source Select", direction = "vertical"}
         local hori_flow = frame.add{type = "table", name = "hori_flow", column_count = 2}
@@ -173,10 +173,8 @@ function create_inputs_select_frame(player_index, output_specs)
             player_index,
             confirm_button,
             defines.events.on_gui_click,
-            function(e)
-                game.players[e.player_index].insert("blueprint")
-                local item = game.players[e.player_index].get_main_inventory().find_item_stack("blueprint")
-                BlueprintGraph.generate_blueprint(blueprint_graph, e.player_index, item)
+            function()
+                blueprint_graph:generate_blueprint()
             end
         )
 end
