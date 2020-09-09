@@ -8,7 +8,7 @@ require("test")
 -- Note that global data cannot be metatable
 function init_all_global()
     --- @class PlayerSetting
-    --- @field factory_priority string[]
+    --- @field factory_priority any[] factory prototype
     --- @field belt number
     --- @type table<player_index, PlayerSetting>
     global.settings = global.settings or {}
@@ -34,7 +34,6 @@ end)
 
 script.on_event(defines.events.on_player_joined_game, function(e)
     init_player_mod(e.player_index)
-    start_unit_tests(e.player_index)
 end)
 
 start_listening_events()

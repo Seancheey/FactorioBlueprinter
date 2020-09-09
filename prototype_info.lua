@@ -71,15 +71,27 @@ local prototype_addition = {
     }
 }
 
+--- fields that allows prototype.field == nil to exist.
+local nullable_fields = newtable({ "fluid_boxes"})
+
 --- @return any an entity prototype with additional information if available
 function get_entity_prototype(name)
     local entity = game.entity_prototypes[name]
-    if prototype_addition[name] then
-        return setmetatable({}, {
-            __index = function(_, k)
-                return prototype_addition[name][k] or entity[k]
+    return setmetatable({}, {
+        __index = function(_, k)
+            debug_print(k)
+            if nullable_fields:has(k) then
+                if prototype_addition[name] then
+                    return prototype_addition[name][k]
+                else
+                    return nil
+                end
+            else
+                if prototype_addition[name] then
+                    return prototype_addition[name][k] or entity[k]
+                end
+                return entity[k]
             end
-        })
-    end
-    return entity
+        end
+    })
 end

@@ -1,4 +1,5 @@
 require("helper")
+require("prototype_info")
 
 --- @alias recipe_prototype any
 --- @alias recipe_name string
@@ -14,13 +15,18 @@ require("helper")
 --- @field position Coordinate
 --- @field direction any defines.direction.east/south/west/north
 
+--- @class ConnectionPoint
+--- @field ingredients ingredient_name[] ingredients that the connection point is transporting
+--- @field entity Entity
+
 --- @class BlueprintSection
 --- @field entities Entity[]
---- @field inlets number[] index of inlets in entities list
---- @field outlets number[] index of outlets in entities list
+--- @field inlets ConnectionPoint[]
+--- @field outlets ConnectionPoint[]
 
 --- @type BlueprintSection
 BlueprintSection = {}
+BlueprintSection.__index = BlueprintSection
 
 --- @return BlueprintSection
 function BlueprintSection.new()
@@ -45,6 +51,13 @@ function BlueprintSection:copy_with_offset(xoff, yoff)
     return new_section
 end
 
+--- @param entity Entity
+function BlueprintSection:add(entity)
+    assertAllTruthy(self, entity)
+    entity.entity_number = #self.entities + 1
+    self.entities[entity.entity_number] = entity
+end
+
 --- concatenate with another section, assuming that self's outlets and other's inlets are connected.
 --- If no offsets are provided, default to concatenate other to right side.
 --- @param other BlueprintSection
@@ -56,13 +69,17 @@ function BlueprintSection:concat(other, xoff, yoff)
     xoff = xoff or self.width()
     yoff = yoff or 0
 
-    self.outlets = newtable(other.outlets):map(function(x) return x + #self.entities end)
-
+    self.outlets = {}
     for _, entity in ipairs(other.entities) do
         local new_entity = Table.shallow_copy(entity)
         new_entity.xoff = new_entity.xoff + xoff
         new_entity.yoff = new_entity.yoff + yoff
-        self.entities[#self.entities+1] = new_entity
+        self.entities[#self.entities + 1] = new_entity
+        for _, connection in ipairs(other.outlets) do
+            if connection.entity == entity then
+                self.outlets[#self.outlets + 1] = { entity = new_entity, ingredients = connection.ingredients }
+            end
+        end
     end
 
     self:organize_entity_uid()
@@ -73,7 +90,7 @@ function BlueprintSection:width()
     -- TODO verify width calculation
     local min, max
     for _, entity in ipairs(self.entities) do
-        test_min = entity.position.x - game.entity_prototypes[entity.name].selection_box.left_top.x
+        test_min = entity.position.x + game.entity_prototypes[entity.name].selection_box.left_top.x
         if not min or test_min < min then
             min = test_min
         end
@@ -143,113 +160,117 @@ function AssemblerNode.new(o)
     return o
 end
 
-function create_crafting_unit(entities, recipe_name, factory_name, belt_name, xoff, yoff, belt_positions, factory_off, inserter_positions)
-    local factory_size = 3 -- should be determined from prototype
-    if belt_positions == nil or factory_off == nil or inserter_positions == nil then
-        -- three templates
-        local input_num = #game.recipe_prototypes[recipe_name].ingredients
-        local output_num = #game.recipe_prototypes[recipe_name].products
-        local item_speeds = {}
-        for _, ingredient in ipairs(game.recipe_prototypes[recipe_name].ingredients) do
-            item_speeds[ingredient.name] = ingredient.amount * game.entity_prototypes[factory_name].crafting_speed
-        end
-        for _, product in ipairs(game.recipe_prototypes[recipe_name].products) do
-            item_speeds[product.name] = product.amount * game.entity_prototypes[factory_name].crafting_speed
-        end
-        -- TODO: adjust inserter type according to item speeds
-        if input_num == 1 and output_num == 1 then
-            belt_positions = { [0] = defines.direction.north, [factory_size + 3] = defines.direction.north }
-            inserter_positions = { [1] = { { name = "fast-inserter", direction = defines.direction.south } }, [factory_size + 2] = { { name = "fast-inserter", direction = defines.direction.south } } }
-            factory_off = 2
-        elseif input_num == 2 and output_num == 1 then
-            belt_positions = { [0] = defines.direction.north, [factory_size + 3] = defines.direction.north, [factory_size + 4] = defines.direction.north }
-            inserter_positions = { [1] = { { name = "fast-inserter", direction = defines.direction.south } }, [factory_size + 2] = { { name = "fast-inserter", direction = defines.direction.south }, { name = "long-handed-inserter", direction = defines.direction.south } } }
-            factory_off = 2
-        elseif input_num == 3 and output_num == 1 then
-            belt_positions = { [0] = defines.direction.north, [1] = defines.direction.south, [factory_size + 4] = defines.direction.north, [factory_size + 5] = defines.direction.north }
-            inserter_positions = { [2] = { { name = "fast-inserter", direction = defines.direction.north }, { name = "long-handed-inserter", direction = defines.direction.south } }, [factory_size + 3] = { { name = "fast-inserter", direction = defines.direction.south }, { name = "long-handed-inserter", direction = defines.direction.south } } }
-            factory_off = 3
-        else
-            debug_print("Unsupported recipe " .. recipe_name .. "with " .. input_num .. " inputs and " .. output_num .. " outputs")
-        end
-    end
-    local eid = #entities + 1
-    -- setup belts
-    for x = 0, factory_size - 1 do
-        for y, direction in pairs(belt_positions) do
-            entities[eid] = {
-                entity_number = eid,
-                name = belt_name,
-                position = { x = x + xoff, y = y + yoff },
-                direction = defines.direction.east,
-            }
-            eid = eid + 1
-        end
-    end
-    -- -- setup factory
-    entities[eid] = {
-        entity_number = eid,
-        name = factory_name,
-        position = { x = xoff + math.floor(factory_size / 2), y = math.floor(factory_size / 2) + factory_off + yoff },
-        recipe = recipe_name
-    }
-    eid = eid + 1
-    -- setup inserters
-    for y, inserters in pairs(inserter_positions) do
-        for x, config in ipairs(inserters) do
-            entities[eid] = {
-                entity_number = eid,
-                name = config.name,
-                position = { x = x - 1 + xoff, y = y + yoff },
-                direction = config.direction
-            }
-            eid = eid + 1
-        end
-    end
-    return belt_positions, factory_off
-end
-
 function AssemblerNode:tostring()
     return "{" .. self.recipe .. "  sources:" .. self.sources:keys():tostring() .. ", targets:" .. self.targets:keys():tostring() .. "}"
 end
 
-function AssemblerNode:generate_blueprint(player_index, item, eid, xoff, yoff)
-    if not xoff then
-        xoff = 0
+--- generate a blueprint section with a single crafting machine unit
+--- @return BlueprintSection
+function AssemblerNode:generate_crafting_unit()
+    local section = BlueprintSection.new()
+    local crafting_machine = self:get_crafting_machine_prototype()
+    local crafter_width = math.ceil(crafting_machine.selection_box.right_bottom.x - crafting_machine.selection_box.left_top.x)
+    local crafter_height = math.ceil(crafting_machine.selection_box.right_bottom.y - crafting_machine.selection_box.left_top.y)
+    local ingredients = self.recipe.ingredients
+    local products = self.recipe.products
+
+    section:add({
+        -- set top-left corner of crafting machine to 0,0
+        position = { x = math.floor(crafter_width / 2), y = math.floor(crafter_height / 2) },
+        name = crafting_machine.name
+    })
+
+    -- specify available parallel transporting lines
+    --- @class fulfilled_line
+    --- @field item boolean true if it is unavailable
+    --- @field fluid boolean true if fluid is unavailable
+
+    --- @type table<number, fulfilled_line> key is y coordinate of the line
+    fulfilled_lines = {}
+    --- @type number[]
+    line_check_order = {}
+    -- populate available transporting lines in order like -2, 2, -3, 3 ...
+    -- available transporting line starting 2 block away from crafting machine,
+    -- since 1 block away are all inserters
+    for yoff = 2, 10, 1 do
+        for side = -1, 1, 2 do
+            local y = yoff * side + (side < 0 and 0 or crafter_height - 1)
+            line_check_order[#line_check_order + 1] = y
+            fulfilled_lines[y] = {}
+        end
     end
-    if not yoff then
-        yoff = 0
-    end
-    -- determine if there is belt bottleneck for single row layout
-    local belt_speed = belt_speed_of(ALL_BELTS[global.settings[player_index].belt]) --[[ should become player's preference later ]]
-    local max_row = 1
-    for _, product in ipairs(self.recipe.products) do
-        if product.type == "item" then
-            local row_num = product.amount * self.recipe_speed / belt_speed
-            if row_num > max_row then
-                max_row = row_num
+
+    -- populate actual transporting lines for each ingredient
+    local preferred_belt = self:get_preferred_belt()
+
+    local input_fluid_positions = newtable(crafting_machine.fluid_boxes)
+            :filter(
+            function(box)
+                if type(box) ~= "table" or box.production_type == "output" then
+                    return false
+                end
+                return true
+            end)
+            :map(
+            function(box)
+                return box.pipe_connections[1].position
+            end)
+    local input_fluid_index = 1
+    -- TODO should concatenate ingredients and products together
+    for _, ingredient in ipairs(ingredients) do
+        -- find next available transporting line to fill
+        for _, y in ipairs(line_check_order) do
+            local line = fulfilled_lines[y]
+            if not line[ingredient.type] then
+                -- success only if fluid input position and line is at same side
+                if ingredient.type == "fluid" and input_fluid_positions[input_fluid_index][2] * y > 0 then
+                    -- different fluid line can't be neighboring each other
+                    if fulfilled_lines[y + 1] then
+                        fulfilled_lines[y + 1].fluid = true
+                    end
+                    if fulfilled_lines[y - 1] then
+                        fulfilled_lines[y - 1].fluid = true
+                    end
+                    line.item = true
+                    line.fluid = true
+                    -- populate transportation line to section
+                    for x = 0, crafter_width - 1, 1 do
+                        section:add({
+                            name = "pipe",
+                            position = { x = x, y = y }
+                        })
+                    end
+                    -- TODO add connection pipe
+                    break
+                elseif ingredient.type == "item" then
+                    line.item = true
+                    line.fluid = true
+                    -- populate transportation line to section
+                    for x = 0, crafter_width - 1, 1 do
+                        section:add({
+                            name = preferred_belt.name,
+                            position = { x = x, y = y },
+                            direction = defines.direction.east
+                        })
+                    end
+                    -- TODO add inserter
+
+                    break
+                end
             end
         end
     end
-    for _, ingredient in ipairs(self.recipe.ingredients) do
-        if ingredient.type == "item" then
-            local row_num = ingredient.amount * self.recipe_speed / belt_speed
-            if row_num > max_row then
-                max_row = row_num
-            end
-        end
-    end
+
+    return section
 end
 
 --- @return BlueprintSection
 function AssemblerNode:generate_section()
-    --- @return BlueprintSection
-    function generate_unit()
 
-    end
+    -- concatenate multiple crafting units horizontally to create a section
 
-    -- concat those units
-
+    -- TODO use multiple units
+    return self:generate_crafting_unit()
 end
 
 --- get a crafting machine prototype that user preferred
@@ -261,17 +282,29 @@ function AssemblerNode:get_crafting_machine_prototype()
     -- get recipe category
     local recipe_category = self.recipe.category
     -- match category
-    local matching_prototypes = newtable(crafting_machines):filter(function(prototype)
-        return newtable(prototype.crafting_categories):has(recipe_category)
-    end)
+    local matching_prototypes = {}
+    for _, prototype in pairs(crafting_machines) do
+        if prototype.crafting_categories[recipe_category] ~= nil then
+            matching_prototypes[#matching_prototypes + 1] = prototype
+        end
+    end
+
     -- select first preferred
     for _, crafting_machine in ipairs(global.settings[self.player_index].factory_priority) do
         for _, matching_prototype in ipairs(matching_prototypes) do
-            if crafting_machine == matching_prototype.name then
-                return matching_prototype
+            if crafting_machine.name == matching_prototype.name then
+                return get_entity_prototype(matching_prototype.name)
             end
         end
     end
+    -- if there is no player preference, select first available
+    debug_print("W: no player preference matches recipe prototype")
+    return get_entity_prototype(matching_prototypes[1].name)
+end
+
+--- @return any belt prototype
+function AssemblerNode:get_preferred_belt()
+    return game.entity_prototypes["transport-belt"]
 end
 
 --- @class BlueprintGraph
@@ -294,18 +327,78 @@ function BlueprintGraph.new(player_index)
     return o
 end
 
-function BlueprintGraph:generate_graph_by_outputs(requirements)
-    if is_final == nil then
-        is_final = true
-    end
-    for _, requirement in ipairs(requirements) do
+--- @param output_specs OutputSpec[]
+function BlueprintGraph:generate_graph_by_outputs(output_specs)
+    assertAllTruthy(self, output_specs)
+
+    for _, requirement in ipairs(output_specs) do
         if requirement.ingredient and requirement.crafting_speed then
-            self:generate_assembler(requirement.ingredient, requirement.crafting_speed, true)
+            self:__generate_assembler(requirement.ingredient, requirement.crafting_speed, true)
         end
     end
 end
 
-function BlueprintGraph:generate_assembler(recipe_name, crafting_speed, is_final)
+function BlueprintGraph:use_products_as_input(item_name)
+    self.__index = BlueprintGraph.__index
+    setmetatable(self, self)
+    nodes = self:__assemblers_whose_ingredients_have(item_name)
+    if nodes:any(function(x)
+        return self.outputs:has(x)
+    end) then
+        debug_print("I: ingredient can't be more advanced")
+        return
+    end
+
+    self.inputs[item_name] = nil
+    for _, node in pairs(nodes) do
+        for _, product in ipairs(node.products) do
+            for _, target in pairs(self:__assemblers_whose_ingredients_have(product.name)) do
+                self.inputs[product.name] = target
+            end
+        end
+    end
+
+    -- remove unnecessary input sources that are fully covered by other sources
+    local others = self.inputs:shallow_copy()
+    local to_remove = {}
+    for input_name, input_node in pairs(self.inputs) do
+        others[input_name] = nil
+        if self:__ingredient_fully_used_by(input_name, others:keys()) then
+            to_remove[input_name] = input_node
+        end
+        others[input_name] = input_node
+    end
+    for input_name, _ in pairs(to_remove) do
+        --debug_print(input_name.." is covered")
+        self.inputs[input_name] = nil
+    end
+end
+
+function BlueprintGraph:use_ingredients_as_input(item_name)
+    self.__index = BlueprintGraph.__index
+    setmetatable(self, self)
+    local viable = false
+    for _, node in pairs(self:__assemblers_whose_products_have(item_name)) do
+        for _, ingredient in pairs(node.ingredients) do
+            self.inputs[ingredient.name] = node
+            viable = true
+        end
+    end
+    if viable then
+        self.inputs[item_name] = nil
+    end
+end
+
+function BlueprintGraph:generate_blueprint()
+    -- insert a new item into player's inventory
+    game.players[self.player_index].insert("blueprint")
+    local item = game.players[self.player_index].get_main_inventory().find_item_stack("blueprint")
+    for _, output_node in pairs(self.outputs) do
+        item.set_blueprint_entities(output_node:generate_section().entities)
+    end
+end
+
+function BlueprintGraph:__generate_assembler(recipe_name, crafting_speed, is_final)
     assert(self and recipe_name and crafting_speed and (is_final ~= nil))
     local recipe = game.recipe_prototypes[recipe_name]
     if recipe then
@@ -327,13 +420,14 @@ function BlueprintGraph:generate_assembler(recipe_name, crafting_speed, is_final
             end
         end
         if new_speed == nil then
-            debug_print("speed setup for " .. recipe_name .. " failed")
+            debug_print("E: speed setup for " .. recipe_name .. " failed")
+            new_speed = 1
         end
         -- setup children nodes
         for _, ingredient in ipairs(node.ingredients) do
             child_recipe = game.recipe_prototypes[ingredient.name]
             if child_recipe then
-                local child = self:generate_assembler(child_recipe.name, ingredient.amount * new_speed, false)
+                local child = self:__generate_assembler(child_recipe.name, ingredient.amount * new_speed, false)
                 node.sources[ingredient.name] = child
                 child.targets[recipe_name] = node
             else
@@ -346,7 +440,7 @@ function BlueprintGraph:generate_assembler(recipe_name, crafting_speed, is_final
     end
 end
 
-function BlueprintGraph:assemblers_whose_products_have(item_name)
+function BlueprintGraph:__assemblers_whose_products_have(item_name)
     if self[item_name] then
         return newtable { self[item_name] }
     end
@@ -362,7 +456,7 @@ function BlueprintGraph:assemblers_whose_products_have(item_name)
     return out
 end
 
-function BlueprintGraph:assemblers_whose_ingredients_have(item_name)
+function BlueprintGraph:__assemblers_whose_ingredients_have(item_name)
     assert(self and item_name)
     local out = newtable {}
     if self[item_name] then
@@ -382,7 +476,7 @@ function BlueprintGraph:assemblers_whose_ingredients_have(item_name)
     return out
 end
 
-function BlueprintGraph:ingredient_fully_used_by(ingredient_name, item_list)
+function BlueprintGraph:__ingredient_fully_used_by(ingredient_name, item_list)
     if self.outputs[ingredient_name] then
         return false
     end
@@ -390,88 +484,13 @@ function BlueprintGraph:ingredient_fully_used_by(ingredient_name, item_list)
         return true
     end
     products = newtable {}
-    for _, node in ipairs(self:assemblers_whose_ingredients_have(ingredient_name)) do
+    for _, node in ipairs(self:__assemblers_whose_ingredients_have(ingredient_name)) do
         for _, p in ipairs(node.products) do
             products[#products + 1] = p.name
         end
     end
     --debug_print(ingredient_name.."'s products:"..products:tostring())
     return products:all(function(p)
-        return self:ingredient_fully_used_by(p, item_list)
+        return self:__ingredient_fully_used_by(p, item_list)
     end)
-end
-
-function BlueprintGraph:use_products_as_input(item_name)
-    self.__index = BlueprintGraph.__index
-    setmetatable(self, self)
-    nodes = self:assemblers_whose_ingredients_have(item_name)
-    if nodes:any(function(x)
-        return self.outputs:has(x)
-    end) then
-        debug_print("ingredient can't be more advanced")
-        return
-    end
-
-    self.inputs[item_name] = nil
-    for _, node in pairs(nodes) do
-        for _, product in ipairs(node.products) do
-            for _, target in pairs(self:assemblers_whose_ingredients_have(product.name)) do
-                self.inputs[product.name] = target
-            end
-        end
-    end
-
-    -- remove unnecessary input sources that are fully covered by other sources
-    local others = self.inputs:shallow_copy()
-    local to_remove = {}
-    for input_name, input_node in pairs(self.inputs) do
-        others[input_name] = nil
-        if self:ingredient_fully_used_by(input_name, others:keys()) then
-            to_remove[input_name] = input_node
-        end
-        others[input_name] = input_node
-    end
-    for input_name, node in pairs(to_remove) do
-        --debug_print(input_name.." is covered")
-        self.inputs[input_name] = nil
-    end
-end
-
-function BlueprintGraph:use_ingredients_as_input(item_name)
-    self.__index = BlueprintGraph.__index
-    setmetatable(self, self)
-    local viable = false
-    for _, node in pairs(self:assemblers_whose_products_have(item_name)) do
-        for _, ingredient in pairs(node.ingredients) do
-            self.inputs[ingredient.name] = node
-            viable = true
-        end
-    end
-    if viable then
-        self.inputs[item_name] = nil
-    end
-end
-
-function BlueprintGraph:tostring(nodes, indent)
-    local indent = indent or 0
-    local nodes = nodes or self.outputs
-    local indent_str = ""
-    for i = 1, indent do
-        indent_str = indent_str .. "  "
-    end
-    local out = ""
-    for _, node in pairs(nodes) do
-        out = out .. indent_str .. node:tostring() .. "\n"
-        out = out .. self:tostring(node.sources, indent + 1) .. "\n"
-    end
-    return out:sub(1, -2)
-end
-
-function BlueprintGraph:generate_blueprint()
-    -- insert a new item into player's inventory
-    game.players[self.player_index].insert("blueprint")
-    local item = game.players[self.player_index].get_main_inventory().find_item_stack("blueprint")
-    local entities = {}
-    -- create_crafting_unit(entities, "inserter", factories_of_recipe("inserter")[1].name, preferred_belt(self.player_index), 0, 0)
-    item.set_blueprint_entities(entities)
 end
