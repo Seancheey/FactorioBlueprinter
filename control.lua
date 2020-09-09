@@ -1,4 +1,5 @@
 require("gui")
+require("test")
 
 --- @alias player_index number
 
@@ -33,6 +34,7 @@ end)
 
 script.on_event(defines.events.on_player_joined_game, function(e)
     init_player_mod(e.player_index)
+    start_unit_tests(e.player_index)
 end)
 
 start_listening_events()
