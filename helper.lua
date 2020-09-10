@@ -20,10 +20,10 @@ end
 function Table:keys()
     assert(self)
     local keyset = newtable()
-    local n=0
+    local n = 0
     for k, _ in pairs(self) do
-      n=n+1
-      keyset[n]=k
+        n = n + 1
+        keyset[n] = k
     end
     return keyset
 end
@@ -32,10 +32,10 @@ end
 function Table:values()
     assert(self)
     local valset = newtable()
-    local n=0
+    local n = 0
     for _, v in pairs(self) do
-      n=n+1
-      valset[n]=v
+        n = n + 1
+        valset[n] = v
     end
     return valset
 end
@@ -56,7 +56,7 @@ end
 --- @return HelperTable
 function Table:map(f)
     assert(self and f)
-    local out = newtable{}
+    local out = newtable {}
     for k, v in pairs(self) do
         out[k] = f(v)
     end
@@ -67,9 +67,9 @@ end
 --- @return HelperTable
 function Table:filter(f)
     assert(self and f)
-    local out = newtable{}
+    local out = newtable {}
     local i = 1
-    for _,v in pairs(self) do
+    for _, v in pairs(self) do
         if f(v) then
             out[i] = v
             i = i + 1
@@ -81,7 +81,9 @@ end
 --- @param f function(ele: any):boolean
 --- @return boolean
 function Table:all(f)
-    f = f or function(x) return x end
+    f = f or function(x)
+        return x
+    end
     assert(self and f)
     for _, v in pairs(self) do
         if not f(v) then
@@ -94,7 +96,9 @@ end
 --- @param f function(ele: any):boolean
 --- @return boolean
 function Table:any(f)
-    f = f or function(x) return x end
+    f = f or function(x)
+        return x
+    end
     assert(self and f)
     for _, v in pairs(self) do
         if f(v) then
@@ -104,19 +108,18 @@ function Table:any(f)
     return false
 end
 
-
 function Table:tostring()
     local keys = ""
-    for k,v in pairs(self) do
+    for k, v in pairs(self) do
         keys = keys .. tostring(k) .. ": " .. tostring(v) .. ","
     end
-    keys = "{" .. keys:sub(1,-2) .. "}"
+    keys = "{" .. keys:sub(1, -2) .. "}"
     return keys
 end
 
 function Table:shallow_copy()
-    local out = newtable{}
-    for k,v in pairs(self) do
+    local out = newtable {}
+    for k, v in pairs(self) do
         out[k] = v
     end
     return out
@@ -124,16 +127,20 @@ end
 
 function sprite_of(name)
     if game.item_prototypes[name] then
-        return "item/"..name
+        return "item/" .. name
     elseif game.fluid_prototypes[name] then
-        return "fluid/"..name
+        return "fluid/" .. name
     end
 end
 
--- raise error if any value is nil or false
--- note: 0 / "" will pass the assertion in lua
+--- raises error if any value is nil
 function assertAllTruthy(...)
-    for i, v in ipairs({...}) do
-        assert(v, "ERROR: argument at position " .. i .. " is falsy.")
+    local n = select("#", ...)
+    local arg_num = 0
+    for _, _ in pairs { ... } do
+        arg_num = arg_num + 1
+    end
+    if n ~= arg_num then
+        assert(false, "needs " .. n .. " arguments but only provided " .. arg_num .. " non-nil arguments")
     end
 end
