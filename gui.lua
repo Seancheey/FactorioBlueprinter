@@ -21,7 +21,7 @@ function remove_gui(player_index, gui_name)
     assertAllTruthy(player_index, gui_name)
 
     if gui_root(player_index)[gui_name] then
-        unregister_all_handlers(player_index, elem_of(gui_name, gui_root(player_index)))
+        unregister_all_handlers(player_index, elem_of(gui_name, player_index))
         gui_root(player_index)[gui_name].destroy()
     end
 end
@@ -39,6 +39,7 @@ end
 function init_player_gui(player_index)
     assertAllTruthy(player_index)
 
+    remove_gui(player_index, main_button)
     remove_gui(player_index, outputs_select_frame)
     remove_gui(player_index, inputs_select_frame)
 
@@ -71,7 +72,7 @@ function create_outputs_select_frame(player_index)
                 )
             local setting_tab = tab_pane.add{type = "tab",name = "setting_tab",caption = "settings"}
                 local vertical_flow = tab_pane.add{type = "flow", name="vertical_flow",direction = "vertical"}
-                    local priority_label = vertical_flow.add{type = "label", name="priority_label", caption = "Factory Priorities", tooltip = "Factories in front will be picked to generate blueprints first"}
+                    vertical_flow.add{type = "label", name="priority_label", caption = "Factory Priorities", tooltip = "Factories in front will be picked to generate blueprints first"}
                     local priority_table = vertical_flow.add{type = "table", name="priority_table", column_count = 8}
                         for i, factory in ipairs(global.settings[player_index].factory_priority) do
                             priority_table.add{type = "sprite", name = "sprite_"..tostring(i), sprite = sprite_of(factory.name)}
@@ -87,13 +88,13 @@ function create_outputs_select_frame(player_index)
                                     priority[i] = swapped
                                     priority[i-1] = this
                                     -- swap gui
-                                    elem_of(path_of(priority_table).."|sprite_"..tostring(i),e.gui).sprite = sprite_of(swapped.name)
-                                    elem_of(path_of(priority_table).."|sprite_"..tostring(i-1),e.gui).sprite = sprite_of(this.name)
+                                    elem_of(path_of(priority_table).."|sprite_"..tostring(i),e.player_index).sprite = sprite_of(swapped.name)
+                                    elem_of(path_of(priority_table).."|sprite_"..tostring(i-1),e.player_index).sprite = sprite_of(this.name)
                                 end
                            )
                         end
 
-                    local belt_label = vertical_flow.add{type = "label", name = "belt_label", caption="Belt Preference"}
+                    vertical_flow.add{type = "label", name = "belt_label", caption="Belt Preference"}
                     local belt_choose_table = vertical_flow.add{type = "table", name="choose_table" , column_count = 2*#ALL_BELTS}
                         for i,belt_name in ipairs(ALL_BELTS) do
                             belt_choose_table.add{type = "sprite", sprite = sprite_of(belt_name)}
@@ -103,11 +104,11 @@ function create_outputs_select_frame(player_index)
                                     global.settings[e.player_index].belt = i
                                     for other = 1,3 do
                                         if other ~= i then
-                                            elem_of(parent_path.."|bp_setting_choose_belt_button"..tostring(other), e.gui).state = false
+                                            elem_of(path_of(belt_choose_table).."|bp_setting_choose_belt_button"..tostring(other), e.player_index).state = false
                                         end
                                     end
                                 end
-                            , {i=i, parent_path = path_of(belt_choose_table)})
+                            )
                         end
             tab_pane.add_tab(output_tab, output_flow)
             tab_pane.add_tab(setting_tab, vertical_flow)
@@ -123,6 +124,7 @@ function __add_output_item_selection_box(player_index, parent, outputs_specifica
     local choose_button = parent.add{name = "bp_output_choose_button"..tostring(row_num), type = "choose-elem-button", elem_type = "recipe"}
     register_gui_event_handler(player_index,choose_button, defines.events.on_gui_elem_changed,
             function(e)
+                insert_test_blueprint(e.element.elem_value, e.player_index)
                 outputs_specifications[row_num].ingredient = e.element.elem_value
                 -- expand table if full
                 if outputs_specifications:all(function(x) return x.ingredient end) then
@@ -186,7 +188,7 @@ function __create_input_buttons(player_index, gui_parent, blueprint_graph)
     end
     for ingredient_name, _ in pairs(blueprint_graph.inputs) do
         local left_button = gui_parent.add{type="sprite-button", name = "left_button_"..ingredient_name, sprite="utility/left_arrow", tooltip="use it's ingredient instead"}
-        local ingredient_sprite = gui_parent.add{type="sprite", name = "sprite_"..ingredient_name, sprite=sprite_of(ingredient_name)}
+        gui_parent.add{type="sprite", name = "sprite_"..ingredient_name, sprite=sprite_of(ingredient_name)}
         local right_button = gui_parent.add{type="sprite-button", name = "right_button_"..ingredient_name, sprite="utility/right_arrow", tooltip = "use it's targets instead"}
         register_gui_event_handler(player_index,left_button, defines.events.on_gui_click,
                 function()

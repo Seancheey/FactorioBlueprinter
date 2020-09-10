@@ -50,8 +50,7 @@ function start_listening_events()
 
             -- handle player events
             for path, handle in pairs(gui_handlers[e.player_index][event]) do
-                e.gui = game.players[e.player_index].gui
-                if e.element == elem_of(path, e.gui) then
+                if e.element == elem_of(path, e.player_index) then
                     handle(e)
                     return
                 end
@@ -110,7 +109,7 @@ function unregister_all_handlers(player_index, gui_elem)
     end
 end
 
---- @return any root gui of player for this mod
+--- @return LuaGuiElement root gui of player for this mod
 function gui_root(player_index)
     assertAllTruthy(player_index)
 
@@ -146,14 +145,17 @@ function __elem_of_helper(path_list, gui, i)
                 return __elem_of_helper(path_list, child, i + 1)
             end
         end
-        debug_print("W: path children is not found/invalid when finding " .. path_list[i])
+        debug_print("W: path children is not found/invalid when finding " .. path_list[i] .. " whole path:" .. serpent.line(path_list))
         return nil
     else
         return gui
     end
 end
 
-function elem_of(path, gui)
-    assertAllTruthy(path, gui)
-    return __elem_of_helper(__split_path(path), gui, 1)
+--- @param path string guilib path for the GuiElement
+--- @param player_index player_index
+--- @return LuaGuiElement
+function elem_of(path, player_index)
+    assertAllTruthy(path, player_index)
+    return __elem_of_helper(__split_path(path), gui_root(player_index), 1)
 end
