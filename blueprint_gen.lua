@@ -184,9 +184,9 @@ function AssemblerNode:generate_crafting_unit()
     --- @field fluid boolean true if fluid is unavailable
 
     --- @type table<number, fulfilled_line> key is y coordinate of the line
-    fulfilled_lines = {}
+    local fulfilled_lines = {}
     --- @type number[]
-    line_check_order = {}
+    local line_check_order = {}
     -- populate available transporting lines in order like -2, 2, -3, 3 ...
     -- available transporting line starting 2 block away from crafting machine,
     -- since 1 block away are all inserters
@@ -213,10 +213,21 @@ function AssemblerNode:generate_crafting_unit()
                 end)
                 :map(
                 function(b)
-                    return b.pipe_connections[1].position
+                    return { b.pipe_connections[1].position[1] + math.floor(crafter_width / 2), b.pipe_connections[1].position[2] + math.floor(crafter_height / 2) }
                 end)
     end
-    local input_fluid_index = 1
+
+    --- @type Position[] positions reserved for pipes
+    local pipe_mounting_positions = {}
+    for _, box in ipairs(crafting_machine.fluid_boxes) do
+        local connection_pos = box.pipe_connections[1].position
+        pipe_mounting_positions[#pipe_mounting_positions + 1] = { x = connection_pos[1], y = connection_pos[2] + (connection_pos[2] > 0 and 1 or -1) }
+    end
+    --- @type table<boolean, table<Position, boolean>> positions reserved for inserters, true is positions at bottom of factories, false is positions at top of factories
+    local available_inserter_positions = {}
+
+    --- true for output fluid box index, false for input fluid box index
+    local fluid_box_index = { [true] = 1, [false] = 1 }
     -- concatenate ingredients and products together
     for is_output, crafting_item_list in pairs({ [false] = self.recipe.ingredients, [true] = self.recipe.products }) do
         for _, crafting_item in ipairs(crafting_item_list) do
@@ -225,13 +236,14 @@ function AssemblerNode:generate_crafting_unit()
                 local line = fulfilled_lines[y]
                 if not line[crafting_item.type] then
                     local y_closer_to_factory = y - (y > 0 and 1 or -1)
+                    local corresponding_fluid_box_position = fluid_box_positions[(is_output and "output" or "input")][fluid_box_index[is_output]]
                     if crafting_item.type == "fluid" and
                             -- fluid box's connection position and transport line is at same side
-                            fluid_box_positions[(is_output and "output" or "input")][input_fluid_index][2] * y > 0 and
+                            corresponding_fluid_box_position[2] * y > 0 and
                             -- line next to factory can use pipe directly, so allowed
                             (fulfilled_lines[y_closer_to_factory] == nil or
-                            -- line's side towards factory will be used for underground pipe, which can't be fulfilled
-                            not fulfilled_lines[y_closer_to_factory]["item"]) then
+                                    -- line's side towards factory will be used for underground pipe, which can't be fulfilled
+                                    not fulfilled_lines[y_closer_to_factory]["item"]) then
                         -- different fluid line can't be neighboring each other
                         if fulfilled_lines[y + 1] then
                             fulfilled_lines[y + 1].fluid = true
@@ -253,8 +265,24 @@ function AssemblerNode:generate_crafting_unit()
                                 position = { x = x, y = y }
                             })
                         end
-                        -- TODO add connection pipe
-
+                        if fulfilled_lines[y_closer_to_factory] == nil then
+                            section:add({
+                                name = "pipe",
+                                position = { x = corresponding_fluid_box_position[1], y = y_closer_to_factory }
+                            })
+                        else
+                            section:add({
+                                name = "pipe-to-ground",
+                                position = { x = corresponding_fluid_box_position[1], y = y_closer_to_factory },
+                                direction = y > 0 and defines.direction.south or defines.direction.north
+                            })
+                            section:add({
+                                name = "pipe-to-ground",
+                                position = { x = corresponding_fluid_box_position[1], y = y > 0 and crafter_height or -1 },
+                                direction = y > 0 and defines.direction.north or defines.direction.south
+                            })
+                        end
+                        fluid_box_index[is_output] = fluid_box_index[is_output] + 1
                         break
                     elseif crafting_item.type == "item" then
                         line.item = true
