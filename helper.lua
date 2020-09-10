@@ -13,9 +13,7 @@ Table.__index = Table
 
 --- @return HelperTable
 function newtable(table)
-    out = table or {}
-    setmetatable(out,Table)
-    return out
+    return setmetatable(table or {}, Table)
 end
 
 --- @return HelperTable
@@ -58,7 +56,7 @@ end
 --- @return HelperTable
 function Table:map(f)
     assert(self and f)
-    out = newtable{}
+    local out = newtable{}
     for k, v in pairs(self) do
         out[k] = f(v)
     end
@@ -69,10 +67,12 @@ end
 --- @return HelperTable
 function Table:filter(f)
     assert(self and f)
-    out = newtable{}
-    for k,v in pairs(self) do
+    local out = newtable{}
+    local i = 1
+    for _,v in pairs(self) do
         if f(v) then
-            out[k] = v
+            out[i] = v
+            i = i + 1
         end
     end
     return out
@@ -115,7 +115,7 @@ function Table:tostring()
 end
 
 function Table:shallow_copy()
-    out = newtable{}
+    local out = newtable{}
     for k,v in pairs(self) do
         out[k] = v
     end
