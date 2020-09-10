@@ -201,7 +201,10 @@ function AssemblerNode:generate_crafting_unit()
     -- populate actual transporting lines for each ingredient
     local preferred_belt = self:get_preferred_belt()
 
-    --- @type table<"'input'"|"output", table[]> fluid boxes position of the crafting machine, if available
+    -- connection positions at sides of a factory that's been occupied by a insert or a pipe
+    local occupied_connection_positions = newtable()
+
+    --- @type table<"'input'"|"output", table[]> fluid connection point positions of the crafting machine, if available
     local fluid_box_positions = {}
     for _, connection_type in ipairs({ "output", "input" }) do
         fluid_box_positions[connection_type] = newtable(crafting_machine.fluid_boxes)
@@ -213,21 +216,17 @@ function AssemblerNode:generate_crafting_unit()
                 end)
                 :map(
                 function(b)
-                    return { b.pipe_connections[1].position[1] + math.floor(crafter_width / 2), b.pipe_connections[1].position[2] + math.floor(crafter_height / 2) }
+                    local connection_position = {
+                        b.pipe_connections[1].position[1] + math.floor(crafter_width / 2),
+                        b.pipe_connections[1].position[2] + math.floor(crafter_height / 2)
+                    }
+                    occupied_connection_positions[#occupied_connection_positions + 1] = connection_position
+                    return connection_position
                 end)
     end
-
-    --- @type Position[] positions reserved for pipes
-    local pipe_mounting_positions = {}
-    for _, box in ipairs(crafting_machine.fluid_boxes) do
-        local connection_pos = box.pipe_connections[1].position
-        pipe_mounting_positions[#pipe_mounting_positions + 1] = { x = connection_pos[1], y = connection_pos[2] + (connection_pos[2] > 0 and 1 or -1) }
-    end
-    --- @type table<boolean, table<Position, boolean>> positions reserved for inserters, true is positions at bottom of factories, false is positions at top of factories
-    local available_inserter_positions = {}
-
     --- true for output fluid box index, false for input fluid box index
     local fluid_box_index = { [true] = 1, [false] = 1 }
+    -- TODO should iterate items before fluids so that item line is closer to factory
     -- concatenate ingredients and products together
     for is_output, crafting_item_list in pairs({ [false] = self.recipe.ingredients, [true] = self.recipe.products }) do
         for _, crafting_item in ipairs(crafting_item_list) do
@@ -262,15 +261,20 @@ function AssemblerNode:generate_crafting_unit()
                         for x = 0, crafter_width - 1, 1 do
                             section:add({
                                 name = "pipe",
-                                position = { x = x, y = y }
+                                position = { x = x, y = y },
+                                direction = defines.direction.east
                             })
                         end
+
                         if fulfilled_lines[y_closer_to_factory] == nil then
+                            -- pipe line next to factory only needs one connection pipe
                             section:add({
                                 name = "pipe",
-                                position = { x = corresponding_fluid_box_position[1], y = y_closer_to_factory }
+                                position = corresponding_fluid_box_position,
+                                direction = defines.direction.north
                             })
                         else
+                            -- pipe line further needs a pair of underground connection pipe
                             section:add({
                                 name = "pipe-to-ground",
                                 position = { x = corresponding_fluid_box_position[1], y = y_closer_to_factory },
@@ -278,7 +282,7 @@ function AssemblerNode:generate_crafting_unit()
                             })
                             section:add({
                                 name = "pipe-to-ground",
-                                position = { x = corresponding_fluid_box_position[1], y = y > 0 and crafter_height or -1 },
+                                position = corresponding_fluid_box_position,
                                 direction = y > 0 and defines.direction.north or defines.direction.south
                             })
                         end
@@ -295,8 +299,26 @@ function AssemblerNode:generate_crafting_unit()
                                 direction = defines.direction.east
                             })
                         end
-                        -- TODO add inserter
-
+                        local factory_side_y = y > 0 and crafter_height or -1
+                        local transport_line_distance = math.abs(y - factory_side_y)
+                        local inserter_type = transport_line_distance <= 1 and "inserter" or "long-handed-inserter"
+                        -- TODO should handle transport_line_distance = 3 situation
+                        -- iterate through possible positions for placing inserter
+                        for x = 0, crafter_width - 1, 1 do
+                            if not occupied_connection_positions:any(function(occupied_pos)
+                                return occupied_pos[1] == x and occupied_pos[2] == factory_side_y
+                            end) then
+                                local inserter_position = { x, factory_side_y }
+                                local to_south = (is_output and 1 or -1) * (inserter_position[2] < 0 and 1 or -1)
+                                occupied_connection_positions[#occupied_connection_positions + 1] = inserter_position
+                                section:add({
+                                    name = inserter_type,
+                                    position = inserter_position,
+                                    direction = to_south > 0 and defines.direction.south or defines.direction.north
+                                })
+                                break
+                            end
+                        end
                         break
                     end
                 end
