@@ -1,7 +1,6 @@
 require("helper")
 require("prototype_info")
 
---- @alias recipe_prototype any
 --- @alias recipe_name string
 --- @alias ingredient_name string
 
@@ -138,7 +137,7 @@ function preferred_belt(player_index)
 end
 
 --- @class AssemblerNode represent a group of assemblers for crafting a single recipe
---- @field recipe recipe_prototype
+--- @field recipe LuaRecipePrototype
 --- @field recipe_speed number how fast the recipe should be done per second
 --- @field targets table<ingredient_name, AssemblerNode> target assemblers that outputs are delivered to
 --- @field sources table<ingredient_name, AssemblerNode> assemblers that inputs are received from
@@ -175,7 +174,8 @@ function AssemblerNode:generate_crafting_unit()
     section:add({
         -- set top-left corner of crafting machine to 0,0
         position = { x = math.floor(crafter_width / 2), y = math.floor(crafter_height / 2) },
-        name = crafting_machine.name
+        name = crafting_machine.name,
+        recipe = self.recipe.name
     })
 
     -- specify available parallel transporting lines
