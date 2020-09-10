@@ -171,8 +171,6 @@ function AssemblerNode:generate_crafting_unit()
     local crafting_machine = self:get_crafting_machine_prototype()
     local crafter_width = math.ceil(crafting_machine.selection_box.right_bottom.x - crafting_machine.selection_box.left_top.x)
     local crafter_height = math.ceil(crafting_machine.selection_box.right_bottom.y - crafting_machine.selection_box.left_top.y)
-    local ingredients = self.recipe.ingredients
-    local products = self.recipe.products
 
     section:add({
         -- set top-left corner of crafting machine to 0,0
@@ -203,59 +201,76 @@ function AssemblerNode:generate_crafting_unit()
     -- populate actual transporting lines for each ingredient
     local preferred_belt = self:get_preferred_belt()
 
-    local input_fluid_positions = newtable(crafting_machine.fluid_boxes)
-            :filter(
-            function(box)
-                if type(box) ~= "table" or box.production_type == "output" then
-                    return false
-                end
-                return true
-            end)
-            :map(
-            function(box)
-                return box.pipe_connections[1].position
-            end)
+    --- @type table<"'input'"|"output", table[]> fluid boxes position of the crafting machine, if available
+    local fluid_box_positions = {}
+    for _, connection_type in ipairs({ "output", "input" }) do
+        fluid_box_positions[connection_type] = newtable(crafting_machine.fluid_boxes)
+                :filter(
+                function(box)
+                    local out = type(box) == "table" and box.production_type == connection_type
+                    debug_print(serpent.line(box) .. " == " .. serpent.line(out))
+                    return out
+                end)
+                :map(
+                function(b)
+                    return b.pipe_connections[1].position
+                end)
+    end
     local input_fluid_index = 1
-    -- TODO should concatenate ingredients and products together
-    for _, ingredient in ipairs(ingredients) do
-        -- find next available transporting line to fill
-        for _, y in ipairs(line_check_order) do
-            local line = fulfilled_lines[y]
-            if not line[ingredient.type] then
-                -- success only if fluid input position and line is at same side
-                if ingredient.type == "fluid" and input_fluid_positions[input_fluid_index][2] * y > 0 then
-                    -- different fluid line can't be neighboring each other
-                    if fulfilled_lines[y + 1] then
-                        fulfilled_lines[y + 1].fluid = true
-                    end
-                    if fulfilled_lines[y - 1] then
-                        fulfilled_lines[y - 1].fluid = true
-                    end
-                    line.item = true
-                    line.fluid = true
-                    -- populate transportation line to section
-                    for x = 0, crafter_width - 1, 1 do
-                        section:add({
-                            name = "pipe",
-                            position = { x = x, y = y }
-                        })
-                    end
-                    -- TODO add connection pipe
-                    break
-                elseif ingredient.type == "item" then
-                    line.item = true
-                    line.fluid = true
-                    -- populate transportation line to section
-                    for x = 0, crafter_width - 1, 1 do
-                        section:add({
-                            name = preferred_belt.name,
-                            position = { x = x, y = y },
-                            direction = defines.direction.east
-                        })
-                    end
-                    -- TODO add inserter
+    -- concatenate ingredients and products together
+    for is_output, crafting_item_list in pairs({ [false] = self.recipe.ingredients, [true] = self.recipe.products }) do
+        for _, crafting_item in ipairs(crafting_item_list) do
+            -- find next available transporting line to fill
+            for _, y in ipairs(line_check_order) do
+                local line = fulfilled_lines[y]
+                if not line[crafting_item.type] then
+                    local y_closer_to_factory = y - (y > 0 and 1 or -1)
+                    if crafting_item.type == "fluid" and
+                            -- fluid box's connection position and transport line is at same side
+                            fluid_box_positions[(is_output and "output" or "input")][input_fluid_index][2] * y > 0 and
+                            -- line next to factory can use pipe directly, so allowed
+                            (fulfilled_lines[y_closer_to_factory] == nil or
+                            -- line's side towards factory will be used for underground pipe, which can't be fulfilled
+                            not fulfilled_lines[y_closer_to_factory]["item"]) then
+                        -- different fluid line can't be neighboring each other
+                        if fulfilled_lines[y + 1] then
+                            fulfilled_lines[y + 1].fluid = true
+                        end
+                        if fulfilled_lines[y - 1] then
+                            fulfilled_lines[y - 1].fluid = true
+                        end
+                        -- fluid line's side towards factory are used for underground pipe, so can't use
+                        if fulfilled_lines[y_closer_to_factory] then
+                            fulfilled_lines[y_closer_to_factory].item = true
+                        end
+                        -- occupy this line
+                        line.item = true
+                        line.fluid = true
+                        -- populate transportation line to section
+                        for x = 0, crafter_width - 1, 1 do
+                            section:add({
+                                name = "pipe",
+                                position = { x = x, y = y }
+                            })
+                        end
+                        -- TODO add connection pipe
 
-                    break
+                        break
+                    elseif crafting_item.type == "item" then
+                        line.item = true
+                        line.fluid = true
+                        -- populate transportation line to section
+                        for x = 0, crafter_width - 1, 1 do
+                            section:add({
+                                name = preferred_belt.name,
+                                position = { x = x, y = y },
+                                direction = defines.direction.east
+                            })
+                        end
+                        -- TODO add inserter
+
+                        break
+                    end
                 end
             end
         end
