@@ -454,12 +454,23 @@ function BlueprintGraph:use_ingredients_as_input(item_name)
     end
 end
 
+--- insert a new blueprint item into player's inventory
 function BlueprintGraph:generate_blueprint()
-    -- insert a new item into player's inventory
-    game.players[self.player_index].insert("blueprint")
-    local item = game.players[self.player_index].get_main_inventory().find_item_stack("blueprint")
-    for _, output_node in pairs(self.outputs) do
-        item.set_blueprint_entities(output_node:generate_section().entities)
+    local player_inventory = game.players[self.player_index].get_main_inventory()
+    if not player_inventory.can_insert("blueprint") then
+        debug_print("player's inventory is full, can't insert a new blueprint")
+        return
+    end
+    player_inventory.insert("blueprint")
+    for i = 1, #player_inventory, 1 do
+        if player_inventory[i].is_blueprint and not player_inventory[i].is_blueprint_setup() then
+            -- TODO use full blueprint rather then first output
+            for _, output_node in pairs(self.outputs) do
+                player_inventory[i].set_blueprint_entities(output_node:generate_section().entities)
+                break
+            end
+            break
+        end
     end
 end
 
