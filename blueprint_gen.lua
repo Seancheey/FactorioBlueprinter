@@ -226,17 +226,46 @@ function AssemblerNode:generate_crafting_unit()
     end
     --- true for output fluid box index, false for input fluid box index
     local fluid_box_index = { [true] = 1, [false] = 1 }
+    -- combine 2 input items into a single belt
+    --- @type Ingredient[][]
+    local ingredients_transport_lines = {}
+    do
+        local i = 1
+        local next_item_line = {}
+        while i <= #self.recipe.ingredients do
+            local ingredient = self.recipe.ingredients[i]
+            if ingredient.type == "fluid" then
+                ingredients_transport_lines[#ingredients_transport_lines + 1] = { ingredient }
+            else
+                next_item_line[#next_item_line + 1] = ingredient
+                if #next_item_line == 2 then
+                    ingredients_transport_lines[#ingredients_transport_lines + 1] = next_item_line
+                    next_item_line = {}
+                end
+            end
+            i = i + 1
+        end
+        if #next_item_line > 0 then
+            ingredients_transport_lines[#ingredients_transport_lines + 1] = next_item_line
+        end
+    end
+    --- @type Product[][] output items should stay in a single belt
+    local products_transport_lines = {}
+    for _, product in ipairs(self.recipe.products) do
+        products_transport_lines[#products_transport_lines + 1] = { product }
+    end
     -- TODO should iterate items before fluids so that item line is closer to factory
     -- concatenate ingredients and products together
-    for is_output, crafting_item_list in pairs({ [false] = self.recipe.ingredients, [true] = self.recipe.products }) do
-        for _, crafting_item in ipairs(crafting_item_list) do
+    for is_output, transport_lines in pairs({ [false] = ingredients_transport_lines, [true] = products_transport_lines }) do
+        for _, transport_line_items in ipairs(transport_lines) do
+            local transport_line_type = transport_line_items[1].type
             -- find next available transporting line to fill
             for _, y in ipairs(line_check_order) do
                 local line = fulfilled_lines[y]
-                if not line[crafting_item.type] then
+                if not line[transport_line_type] then
                     local y_closer_to_factory = y - (y > 0 and 1 or -1)
                     local corresponding_fluid_box_position = fluid_box_positions[(is_output and "output" or "input")][fluid_box_index[is_output]]
-                    if crafting_item.type == "fluid" and
+                    if transport_line_type == "fluid" and
                             -- fluid box's connection position and transport line is at same side
                             corresponding_fluid_box_position[2] * y > 0 and
                             -- line next to factory can use pipe directly, so allowed
@@ -288,7 +317,7 @@ function AssemblerNode:generate_crafting_unit()
                         end
                         fluid_box_index[is_output] = fluid_box_index[is_output] + 1
                         break
-                    elseif crafting_item.type == "item" then
+                    elseif transport_line_type == "item" then
                         line.item = true
                         line.fluid = true
                         -- populate transportation line to section
