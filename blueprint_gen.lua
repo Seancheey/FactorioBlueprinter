@@ -211,7 +211,6 @@ function AssemblerNode:generate_crafting_unit()
                 :filter(
                 function(box)
                     local out = type(box) == "table" and box.production_type == connection_type
-                    debug_print(serpent.line(box) .. " == " .. serpent.line(out))
                     return out
                 end)
                 :map(
@@ -316,6 +315,7 @@ function AssemblerNode:generate_crafting_unit()
                             })
                         end
                         fluid_box_index[is_output] = fluid_box_index[is_output] + 1
+                        -- TODO add connection_position
                         break
                     elseif transport_line_type == "item" then
                         line.item = true
@@ -348,6 +348,7 @@ function AssemblerNode:generate_crafting_unit()
                                 break
                             end
                         end
+                        -- TODO add connection position
                         break
                     end
                 end
@@ -392,7 +393,7 @@ function AssemblerNode:get_crafting_machine_prototype()
         end
     end
     -- if there is no player preference, select first available
-    debug_print("W: no player preference matches recipe prototype")
+    print_log("no player preference matches recipe prototype")
     return get_entity_prototype(matching_prototypes[1].name)
 end
 
@@ -439,7 +440,7 @@ function BlueprintGraph:use_products_as_input(item_name)
     if nodes:any(function(x)
         return self.outputs:has(x)
     end) then
-        debug_print("I: ingredient can't be more advanced")
+        print_log("ingredient can't be more advanced", logging.I)
         return
     end
 
@@ -487,7 +488,7 @@ end
 function BlueprintGraph:generate_blueprint()
     local player_inventory = game.players[self.player_index].get_main_inventory()
     if not player_inventory.can_insert("blueprint") then
-        debug_print("player's inventory is full, can't insert a new blueprint")
+        print_log("player's inventory is full, can't insert a new blueprint", logging.I)
         return
     end
     player_inventory.insert("blueprint")
@@ -512,7 +513,7 @@ function BlueprintGraph:__generate_assembler(recipe_name, crafting_speed, is_fin
         local node = self.dict[recipe_name]
         if is_final then
             for _, product in ipairs(node.products) do
-                debug_print("output:" .. product.name)
+                print_log("output:" .. product.name)
                 self.outputs[product.name] = node
             end
         end
@@ -525,7 +526,7 @@ function BlueprintGraph:__generate_assembler(recipe_name, crafting_speed, is_fin
             end
         end
         if new_speed == nil then
-            debug_print("E: speed setup for " .. recipe_name .. " failed")
+            print_log("speed setup for " .. recipe_name .. " failed", logging.E)
             new_speed = 1
         end
         -- setup children nodes
@@ -541,7 +542,7 @@ function BlueprintGraph:__generate_assembler(recipe_name, crafting_speed, is_fin
         end
         return node
     else
-        debug_print(recipe_name .. " doesn't have a recipe. Error")
+        print_log(recipe_name .. " doesn't have a recipe.", logging.E)
     end
 end
 
@@ -594,7 +595,6 @@ function BlueprintGraph:__ingredient_fully_used_by(ingredient_name, item_list)
             products[#products + 1] = p.name
         end
     end
-    --debug_print(ingredient_name.."'s products:"..products:tostring())
     return products:all(function(p)
         return self:__ingredient_fully_used_by(p, item_list)
     end)

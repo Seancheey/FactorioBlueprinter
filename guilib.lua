@@ -46,7 +46,7 @@ function start_listening_events()
             end
 
             if not gui_handlers[e.player_index] or not gui_handlers[e.player_index][event] then
-                debug_print("W: no gui_handlers for player")
+                print_log("no gui_handlers for player", logging.W)
                 return
             end
 
@@ -57,7 +57,6 @@ function start_listening_events()
                     return
                 end
             end
-            debug_print("W: guilib event failed to associate event to registered components")
         end)
     end
 end
@@ -165,7 +164,7 @@ function elem_of(path, player_index)
             end
         end
         if not found then
-            debug_print("W: path children is not found/invalid when finding " .. path_list[i+1] .. " whole path:" .. serpent.line(path_list))
+            print_log("path children is not found/invalid when finding " .. path_list[i+1] .. " whole path:" .. serpent.line(path_list), logging.W)
             return nil
         end
     end

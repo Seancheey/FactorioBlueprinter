@@ -1,7 +1,17 @@
-function debug_print(msg, player_index)
-    local player = player_index and game.players[player_index] or game
-    if true then
-        player.print(tostring(msg))
+logging = {}
+logging.E = 1
+logging.W = 2
+logging.I = 3
+logging.D = 4
+
+function logging.should_output()
+    return true
+end
+
+function print_log(msg, level)
+    level = level or logging.D
+    if logging.should_output(level) then
+        game.print(tostring(msg))
     end
 end
 
