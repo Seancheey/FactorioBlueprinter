@@ -1,6 +1,6 @@
 local test_all = true
 
-require("gui")
+require("gui.gui")
 
 function start_unit_tests(player_index)
     if test_all then

@@ -1,4 +1,9 @@
-require("gui")
+require("helper")
+require("guilib")
+require("gui.gui")
+require("gui.outputs_select_frame")
+require("gui.inputs_select_frame")
+require("blueprint_gen")
 require("test")
 
 --- @alias player_index number
@@ -39,10 +44,10 @@ end)
 start_listening_events()
 
 register_global_gui_event_handler(main_button, defines.events.on_gui_click, function(e)
-    if not gui_root(e.player_index)[outputs_select_frame] then
-        create_outputs_select_frame(e.player_index)
+    if not gui_root(e.player_index)[main_function_frame] then
+        create_main_function_frame(e.player_index)
     else
-        remove_gui(e.player_index, outputs_select_frame)
+        remove_gui(e.player_index, main_function_frame)
         remove_gui(e.player_index, inputs_select_frame)
     end
 end)
