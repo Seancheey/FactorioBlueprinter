@@ -14,6 +14,8 @@ gui_handlers = {}
 -- global_gui_handlers[event][gui_path] = handler
 global_gui_handlers = {}
 
+local gui_root_name = "left"
+
 function __init_guilib_player_handler(player_index)
     gui_handlers[player_index] = gui_handlers[player_index] or {}
     for _, event in ipairs(guilib_listening_events) do
@@ -113,17 +115,24 @@ end
 function gui_root(player_index)
     assertAllTruthy(player_index)
 
-    return game.players[player_index].gui.left
+    local root = game.players[player_index].gui[gui_root_name]
+    assert(root ~= nil, "unable to find player's gui root")
+    return root
 end
 
---returns the path of a gui element represented by "root_name|parent_name|my_name"
+--- @param gui_elem LuaGuiElement
+--- @return string the path of a gui element represented by "root_name|parent_name|my_name ..."
 function path_of(gui_elem)
-    assert(gui_elem.name)
-    if gui_elem.parent then
-        return path_of(gui_elem.parent) .. "|" .. gui_elem.name
-    else
-        return gui_elem.name
+    assertAllTruthy(gui_elem)
+
+    local current_element = gui_elem
+    local path = ""
+    while current_element and current_element.name ~= gui_root_name do
+        path = current_element.name .. "|" .. path
+        current_element = current_element.parent
     end
+    path = gui_root_name .. "|" .. path
+    return path
 end
 
 -- returns the path of a gui element represented by a list in order of [elem_name, parent_name, ... , root_name]
@@ -135,27 +144,31 @@ function __split_path(str)
     return t
 end
 
-function __elem_of_helper(path_list, gui, i)
-    if path_list[i] then
-        if path_list[i] == "left" or path_list[i] == "top" or path_list[i] == "center" then
-            return __elem_of_helper(path_list, gui[path_list[i]], i + 1)
-        end
-        for _, child in ipairs(gui.children) do
-            if child.name and child.name == path_list[i] then
-                return __elem_of_helper(path_list, child, i + 1)
-            end
-        end
-        debug_print("W: path children is not found/invalid when finding " .. path_list[i] .. " whole path:" .. serpent.line(path_list))
-        return nil
-    else
-        return gui
-    end
-end
-
 --- @param path string guilib path for the GuiElement
 --- @param player_index player_index
 --- @return LuaGuiElement
 function elem_of(path, player_index)
     assertAllTruthy(path, player_index)
-    return __elem_of_helper(__split_path(path), gui_root(player_index), 1)
+
+    local path_list = __split_path(path)
+    local i = 1
+    local current_element = gui_root(player_index)
+
+    while i < #path_list do
+        local found = false
+        for _, child in ipairs(current_element.children) do
+            if child.name == path_list[i+1] then
+                current_element = child
+                i = i + 1
+                found = true
+                break
+            end
+        end
+        if not found then
+            debug_print("W: path children is not found/invalid when finding " .. path_list[i+1] .. " whole path:" .. serpent.line(path_list))
+            return nil
+        end
+    end
+
+    return current_element
 end
