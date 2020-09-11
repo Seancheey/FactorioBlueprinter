@@ -79,7 +79,6 @@ function get_entity_prototype(name)
     local entity = game.entity_prototypes[name]
     return setmetatable({}, {
         __index = function(_, k)
-            debug_print(k)
             if nullable_fields:has(k) then
                 if prototype_addition[name] then
                     return prototype_addition[name][k]
