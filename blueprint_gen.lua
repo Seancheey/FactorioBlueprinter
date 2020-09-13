@@ -136,7 +136,7 @@ function preferred_belt(player_index)
     return ALL_BELTS[global.settings[player_index].belt]
 end
 
---- @class AssemblerNode represent a group of assemblers for crafting a single recipe
+--- @class AssemblerNode represent a group of crafting machines for crafting a single recipe
 --- @field recipe LuaRecipePrototype
 --- @field recipe_speed number how fast the recipe should be done per second
 --- @field targets table<ingredient_name, AssemblerNode> target assemblers that outputs are delivered to
@@ -459,7 +459,7 @@ end
 function BlueprintGraph:use_products_as_input(item_name)
     self.__index = BlueprintGraph.__index
     setmetatable(self, self)
-    nodes = self:__assemblers_whose_ingredients_have(item_name)
+    local nodes = self:__assemblers_whose_ingredients_have(item_name)
     if nodes:any(function(x)
         return self.outputs:has(x)
     end) then
@@ -469,7 +469,7 @@ function BlueprintGraph:use_products_as_input(item_name)
 
     self.inputs[item_name] = nil
     for _, node in pairs(nodes) do
-        for _, product in ipairs(node.products) do
+        for _, product in ipairs(node.recipe.products) do
             for _, target in pairs(self:__assemblers_whose_ingredients_have(product.name)) do
                 self.inputs[product.name] = target
             end
@@ -497,7 +497,7 @@ function BlueprintGraph:use_ingredients_as_input(item_name)
     setmetatable(self, self)
     local viable = false
     for _, node in pairs(self:__assemblers_whose_products_have(item_name)) do
-        for _, ingredient in pairs(node.ingredients) do
+        for _, ingredient in pairs(node.recipe.ingredients) do
             self.inputs[ingredient.name] = node
             viable = true
         end
@@ -558,13 +558,14 @@ function BlueprintGraph:__generate_assembler(recipe_name, crafting_speed, is_fin
     end
 end
 
+--- @return AssemblerNode[]
 function BlueprintGraph:__assemblers_whose_products_have(item_name)
     if self[item_name] then
         return newtable { self[item_name] }
     end
     local out = newtable {}
     for _, node in pairs(self.dict) do
-        for _, product in pairs(node.products) do
+        for _, product in pairs(node.recipe.products) do
             if product.name == item then
                 out[#out + 1] = node
                 break
@@ -574,6 +575,7 @@ function BlueprintGraph:__assemblers_whose_products_have(item_name)
     return out
 end
 
+--- @return AssemblerNode[]
 function BlueprintGraph:__assemblers_whose_ingredients_have(item_name)
     assert(self and item_name)
     local out = newtable {}
@@ -584,7 +586,7 @@ function BlueprintGraph:__assemblers_whose_ingredients_have(item_name)
         return out
     end
     for _, node in pairs(self.dict) do
-        for _, ingredient in ipairs(node.ingredients) do
+        for _, ingredient in ipairs(node.recipe.ingredients) do
             if ingredient.name == item_name then
                 out[#out + 1] = node
                 break
@@ -603,7 +605,7 @@ function BlueprintGraph:__ingredient_fully_used_by(ingredient_name, item_list)
     end
     products = newtable {}
     for _, node in ipairs(self:__assemblers_whose_ingredients_have(ingredient_name)) do
-        for _, p in ipairs(node.products) do
+        for _, p in ipairs(node.recipe.products) do
             products[#products + 1] = p.name
         end
     end
