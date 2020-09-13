@@ -13,17 +13,21 @@ require("test")
 -- Note that global data cannot be metatable
 function init_all_global()
     --- @class PlayerSetting
-    --- @field factory_priority any[] factory prototype
+    --- @field factory_priority LuaEntityPrototype[] factory prototype
     --- @field belt number
     --- @type table<player_index, PlayerSetting>
     global.settings = global.settings or {}
 end
 
-function init_player_mod(player_index)
-    global.settings[player_index] = global.settings[player_index] or {
+function default_player_settings()
+    return {
         belt = 1,
-        factory_priority = all_factories()
+        factory_priority = {}
     }
+end
+
+function init_player_mod(player_index)
+    global.settings[player_index] = global.settings[player_index] or default_player_settings()
     init_player_gui(player_index)
 end
 
@@ -39,6 +43,12 @@ end)
 
 script.on_event(defines.events.on_player_joined_game, function(e)
     init_player_mod(e.player_index)
+end)
+
+script.on_configuration_changed(function ()
+    for player_index, _ in ipairs(global.settings) do
+        global.settings[player_index] = default_player_settings()
+    end
 end)
 
 start_listening_events()

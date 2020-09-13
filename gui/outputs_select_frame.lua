@@ -39,6 +39,8 @@ local function add_output_item_selection_box(player_index, parent, outputs_speci
 end
 
 local function create_settings_tab(player_index, tab_pane)
+    update_player_crafting_machine_priorities(player_index)
+
     local setting_tab = tab_pane.add { type = "tab", name = "setting_tab", caption = "settings" }
     local vertical_flow = tab_pane.add { type = "flow", name = "vertical_flow", direction = "vertical" }
     vertical_flow.add { type = "label", name = "priority_label", caption = "Factory Priorities", tooltip = "Factories in front will be picked to generate blueprints first" }
@@ -118,6 +120,7 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
                         local blueprint = insert_blueprint(e.player_index, blueprint_section.entities)
                         if blueprint then
                             blueprint.label = recipe.name .. " crafting unit"
+                            game.players[e.player_index].print("blueprint created")
                         end
                     end
                     remove_gui(e.player_index, main_function_frame)

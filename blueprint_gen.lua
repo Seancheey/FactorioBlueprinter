@@ -118,24 +118,6 @@ INSERTER_SPEEDS = {
     ["stack-filter-inserter"] = 2.31
 }
 
-function all_factories()
-    local factories = {}
-    for _, entity in pairs(game.entity_prototypes) do
-        if entity.crafting_categories and not entity.flags["hidden"] and entity.name ~= "character" then
-            factories[#factories + 1] = entity
-        end
-    end
-    return factories
-end
-
-function belt_speed_of(item_name)
-    return game.entity_prototypes[item_name].belt_speed
-end
-
-function preferred_belt(player_index)
-    return ALL_BELTS[global.settings[player_index].belt]
-end
-
 --- @class AssemblerNode represent a group of crafting machines for crafting a single recipe
 --- @field recipe LuaRecipePrototype
 --- @field recipe_speed number how fast the recipe should be done per second
@@ -268,7 +250,6 @@ function AssemblerNode:generate_crafting_unit()
             end
         end
         item_info_list:addAll(fluid_info_list)
-        print_log(serpent.block(item_info_list, { maxlevel = 2 }))
         return item_info_list
     end
 
@@ -285,7 +266,7 @@ function AssemblerNode:generate_crafting_unit()
                 local corresponding_fluid_box_position = fluid_box_positions[line_info.direction][fluid_box_indices[line_info.direction]]
                 -- pre-check for any crafting machine prototypes with unknown fluid box support
                 if line_info.type == "fluid" and corresponding_fluid_box_position == nil then
-                    print_log("This crafting machine has fluid connection that is not supported by the mod. Failed to make blueprint :(", logging.E)
+                    print_log("This crafting machine has fluid connection that is not supported by the mod yet. Failed to make blueprint :(", logging.E)
                     return
                 end
                 if line_info.type == "fluid" and
@@ -416,7 +397,7 @@ function AssemblerNode:get_crafting_machine_prototype()
         end
     end
     -- if there is no player preference, select first available
-    print_log("no player preference matches recipe prototype")
+    print_log("no player preference matches recipe prototype, the recipe is probably uncraftable for now.", logging.D)
     return get_entity_prototype(matching_prototypes[1].name)
 end
 
@@ -633,3 +614,43 @@ function insert_blueprint(player_index, entities)
     end
 end
 
+function update_player_crafting_machine_priorities(player_index)
+    --- @return HelperTable|LuaEntityPrototype[]
+    local function all_factories()
+        local factories = newtable()
+        for _, entity in pairs(game.get_filtered_entity_prototypes({
+            { filter = "crafting-machine" },
+            { filter = "hidden", invert = true, mode = "and" },
+            { filter = "blueprintable", mode = "and" } })) do
+            factories[#factories + 1] = entity
+        end
+        return factories
+    end
+    --- @type LuaRecipePrototype[]|ArrayList
+    local unlocked_recipes = Table.filter(game.players[player_index].force.recipes, function(recipe)
+        return not recipe.hidden and recipe.enabled
+    end)
+
+    local all_factory_list = all_factories()
+    local unlocked_factories = {}
+    for _, factory in ipairs(all_factory_list) do
+        for _, recipe in pairs(unlocked_recipes) do
+            if Table.has(recipe.products, factory, function(a, b)
+                return a.name == b.name
+            end) then
+                unlocked_factories[#unlocked_factories + 1] = recipe
+                break
+            end
+        end
+    end
+
+    local factory_priority = global.settings[player_index].factory_priority
+
+    for _, unlocked_factory in ipairs(unlocked_factories) do
+        if not Table.has(factory_priority, unlocked_factory, function(a, b)
+            return a.name == b.name
+        end) then
+            ArrayList.insert(factory_priority, unlocked_factory)
+        end
+    end
+end
