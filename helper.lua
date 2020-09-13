@@ -4,8 +4,11 @@ logging.W = 2
 logging.I = 3
 logging.D = 4
 
-function logging.should_output()
-    return true
+function logging.should_output(level)
+    if level == logging.E then
+        return true
+    end
+    return false
 end
 
 function print_log(msg, level)
