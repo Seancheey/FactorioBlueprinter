@@ -1,5 +1,6 @@
 require("helper")
 require("prototype_info")
+require("player_info")
 
 --- @alias recipe_name string
 --- @alias ingredient_name string
@@ -616,36 +617,8 @@ function insert_blueprint(player_index, entities)
 end
 
 function update_player_crafting_machine_priorities(player_index)
-    --- @return HelperTable|LuaEntityPrototype[]
-    local function all_factories()
-        local factories = newtable()
-        for _, entity in pairs(game.get_filtered_entity_prototypes({
-            { filter = "crafting-machine" },
-            { filter = "hidden", invert = true, mode = "and" },
-            { filter = "blueprintable", mode = "and" } })) do
-            factories[#factories + 1] = entity
-        end
-        return factories
-    end
-    --- @type LuaRecipePrototype[]|ArrayList
-    local unlocked_recipes = Table.filter(game.players[player_index].force.recipes, function(recipe)
-        return not recipe.hidden and recipe.enabled
-    end)
-
-    local all_factory_list = all_factories()
-    local unlocked_factories = {}
-    for _, factory in ipairs(all_factory_list) do
-        for _, recipe in pairs(unlocked_recipes) do
-            if Table.has(recipe.products, factory, function(a, b)
-                return a.name == b.name
-            end) then
-                unlocked_factories[#unlocked_factories + 1] = recipe
-                break
-            end
-        end
-    end
-
-    local factory_priority = global.settings[player_index].factory_priority
+    local unlocked_factories = PlayerInfo.unlocked_crafting_machines(player_index)
+    local factory_priority = PlayerInfo.crafting_machine_priorities(player_index)
 
     for _, unlocked_factory in ipairs(unlocked_factories) do
         if not Table.has(factory_priority, unlocked_factory, function(a, b)
