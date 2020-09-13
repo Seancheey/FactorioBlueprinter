@@ -7,6 +7,7 @@
 PlayerInfo = {}
 PlayerInfo.__index = PlayerInfo
 
+--- @return LuaEntityPrototype[]
 function PlayerInfo.unlocked_crafting_machines(player_index)
     local all_factory_list = newtable()
     for _, entity in pairs(game.get_filtered_entity_prototypes({
@@ -15,7 +16,6 @@ function PlayerInfo.unlocked_crafting_machines(player_index)
         { filter = "blueprintable", mode = "and" } })) do
         all_factory_list[#all_factory_list + 1] = entity
     end
-    --- @type LuaRecipePrototype[]|ArrayList
     local unlocked_recipes = PlayerInfo.unlocked_recipes(player_index)
 
     local unlocked_factories = {}
@@ -24,7 +24,7 @@ function PlayerInfo.unlocked_crafting_machines(player_index)
             if Table.has(recipe.products, factory, function(a, b)
                 return a.name == b.name
             end) then
-                unlocked_factories[#unlocked_factories + 1] = recipe
+                unlocked_factories[#unlocked_factories + 1] = factory
                 break
             end
         end
@@ -32,14 +32,17 @@ function PlayerInfo.unlocked_crafting_machines(player_index)
     return unlocked_factories
 end
 
+--- @return LuaEntityPrototype[]
 function PlayerInfo.unlocked_belts(player_index)
 
 end
 
+--- @return LuaEntityPrototype[]
 function PlayerInfo.unlocked_inserters(player_index)
 
 end
 
+--- @return LuaRecipePrototype[]
 function PlayerInfo.unlocked_recipes(player_index)
     local unlocked_recipes = Table.filter(game.players[player_index].force.recipes, function(recipe)
         return not recipe.hidden and recipe.enabled
@@ -47,6 +50,7 @@ function PlayerInfo.unlocked_recipes(player_index)
     return unlocked_recipes
 end
 
+--- @return LuaEntityPrototype[]
 function PlayerInfo.crafting_machine_priorities(player_index)
     return global.settings[player_index].factory_priority
 end
