@@ -107,7 +107,9 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
     local crafting_unit_flow = tab_pane.add { type = "flow", name = "crafting_unit_flow", direction = "vertical" }
     do
         crafting_unit_flow.add { name = "recipe_select_label", type = "label", caption = "Choose a recipe to get a crafting blueprint" }
-        local choose_button = crafting_unit_flow.add { name = "recipe_choose_button", type = "choose-elem-button", elem_type = "recipe" }
+        local choose_button = crafting_unit_flow.add { name = "recipe_choose_button", type = "choose-elem-button", elem_type = "recipe", elem_filters = {
+            enabled = true
+        } }
         register_gui_event_handler(player_index, choose_button, defines.events.on_gui_elem_changed,
                 function(e)
                     local recipe = game.recipe_prototypes[e.element.elem_value]
