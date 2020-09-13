@@ -6,18 +6,19 @@
 main_button = "bp-main-button"
 main_function_frame = "bp-outputs-frame"
 inputs_select_frame = "bp-inputs-frame"
-unit_values = {["item/s"] = 1, ["item/min"] = 60}
-output_units = {"item/s", "item/min"}
+unit_values = { ["item/s"] = 1, ["item/min"] = 60 }
+output_units = { "item/s", "item/min" }
 
 --- clear gui and its children as well as unregister all it's handlers.
 --- Non-existing gui element is tolerated and nothing will be done in this case.
---- @param gui_name string gui element name
+--- @param gui_name string must be one of element in gui root
 function remove_gui(player_index, gui_name)
     assertAllTruthy(player_index, gui_name)
+    local gui = gui_root(player_index)[gui_name]
 
-    if gui_root(player_index)[gui_name] then
-        unregister_all_handlers(player_index, elem_of(gui_name, player_index))
-        gui_root(player_index)[gui_name].destroy()
+    if gui then
+        unregister_all_handlers(player_index, gui)
+        gui.destroy()
     end
 end
 
@@ -38,7 +39,7 @@ function init_player_gui(player_index)
     remove_gui(player_index, main_function_frame)
     remove_gui(player_index, inputs_select_frame)
 
-    gui_root(player_index).add{
+    gui_root(player_index).add {
         type = "button",
         tooltip = "Click to open Blueprinter.",
         caption = "Blueprinter",

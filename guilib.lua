@@ -100,6 +100,8 @@ end
 
 --- unregister all handlers of gui_elem and its children
 function unregister_all_handlers(player_index, gui_elem)
+    assertAllTruthy(player_index, gui_elem)
+
     for _, event in pairs(guilib_listening_events) do
         if gui_handlers[player_index] and gui_handlers[player_index][event] then
             gui_handlers[player_index][event][path_of(gui_elem)] = nil

@@ -512,9 +512,9 @@ function BlueprintGraph:__generate_assembler(recipe_name, crafting_speed, is_fin
             end
         end
         local new_speed
-        for _, product in ipairs(node.products) do
+        for _, product in ipairs(node.recipe.products) do
             if product.name == recipe_name then
-                new_speed = crafting_speed / product.amount
+                new_speed = crafting_speed / (product.amount or ((product.amount_max + product.amount_min) / 2) or 1)
                 node.recipe_speed = node.recipe_speed + new_speed
                 break
             end

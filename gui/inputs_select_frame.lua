@@ -50,8 +50,9 @@ function create_inputs_select_frame(player_index, output_specs)
             player_index,
             confirm_button,
             defines.events.on_gui_click,
-            function()
-                blueprint_graph:generate_blueprint()
+            function(e)
+                -- TODO generate a real blueprint
+                game.players[e.player_index].print("This function is currently not yet completed, it's under active development.")
             end
     )
 end
