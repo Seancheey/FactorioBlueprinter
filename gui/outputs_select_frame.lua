@@ -7,7 +7,6 @@ local function add_output_item_selection_box(player_index, parent, outputs_speci
     local choose_button = parent.add { name = "bp_output_choose_button" .. tostring(row_num), type = "choose-elem-button", elem_type = "recipe" }
     register_gui_event_handler(player_index, choose_button, defines.events.on_gui_elem_changed,
             function(e)
-                insert_test_blueprint(e.element.elem_value, e.player_index)
                 outputs_specifications[row_num].ingredient = e.element.elem_value
                 -- expand table if full
                 if outputs_specifications:all(function(x)
