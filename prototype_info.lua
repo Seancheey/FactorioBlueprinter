@@ -1,4 +1,6 @@
+--- Since we cannot access prototype information outside game loading stage, we need extra prototype information to support any crafting machines with fluid boxes.
 local prototype_addition = {
+    -- Below is fluid prototypes of the base game
     ["assembling-machine-2"] = {
         fluid_boxes = {
             {
@@ -69,10 +71,11 @@ local prototype_addition = {
             }
         },
     }
+    -- Below is prototypes of mods, add your mod fluid box prototype here
 }
 
 --- fields that allows prototype.field == nil to exist.
-local nullable_fields = newtable({ "fluid_boxes"})
+local nullable_fields = newtable({ "fluid_boxes" })
 
 --- @return any an entity prototype with additional information if available
 function get_entity_prototype(name)
