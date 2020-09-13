@@ -18,19 +18,6 @@ end
 --- @class ArrayList
 ArrayList = {}
 ArrayList.__index = ArrayList
-ArrayList.__eq = function (l, r)
-    for i, val in ipairs(l) do
-        if val ~= r[i] then
-            return false
-        end
-    end
-    for i, val in ipairs(r) do
-        if val ~= l[i] then
-            return false
-        end
-    end
-    return true
-end
 
 --- @generic T: ArrayList
 --- @param toCast T listToBeCased
@@ -68,6 +55,18 @@ function ArrayList:addAll(table)
     return self
 end
 
+function ArrayList:insert(val, pos)
+    assertAllTruthy(self, val)
+    local p = pos or 1
+
+    local i = #self + 1
+    while i > p and i > 1 do
+        self[i] = self[i-1]
+        i = i - 1
+    end
+    self[p] = val
+end
+
 --- @class HelperTable
 
 --- @type HelperTable
@@ -103,12 +102,14 @@ function Table:values()
     return valset
 end
 
---- @param val any
+--- @generic T
+--- @param val T
+--- @param eq_func function(a:T, b:T):boolean
 --- @return boolean
-function Table:has(val)
+function Table:has(val, eq_func)
     assert(self and val)
     for _, test in pairs(self) do
-        if val == test then
+        if eq_func and eq_func(val, test) or (val == test) then
             return true
         end
     end
