@@ -15,6 +15,59 @@ function print_log(msg, level)
     end
 end
 
+--- @class ArrayList
+ArrayList = {}
+ArrayList.__index = ArrayList
+ArrayList.__eq = function (l, r)
+    for i, val in ipairs(l) do
+        if val ~= r[i] then
+            return false
+        end
+    end
+    for i, val in ipairs(r) do
+        if val ~= l[i] then
+            return false
+        end
+    end
+    return true
+end
+
+--- @generic T: ArrayList
+--- @param toCast T listToBeCased
+--- @return T
+function ArrayList.cast(toCast)
+    return setmetatable(toCast, ArrayList)
+end
+
+--- @generic T: ArrayList
+--- @param list T listToBeCased
+--- @return T
+function ArrayList.new(list)
+    local o = setmetatable({}, ArrayList)
+    if list then
+        o:addAll(list)
+    end
+    return o
+end
+
+--- @generic T: self
+--- @param val T
+function ArrayList:add(val)
+    assertAllTruthy(self, val)
+
+    self[#self + 1] = val
+    return self
+end
+
+function ArrayList:addAll(table)
+    assertAllTruthy(self, table)
+
+    for _, val in pairs(table) do
+        ArrayList.add(self, val)
+    end
+    return self
+end
+
 --- @class HelperTable
 
 --- @type HelperTable

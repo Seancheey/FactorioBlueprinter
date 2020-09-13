@@ -224,133 +224,151 @@ function AssemblerNode:generate_crafting_unit()
                 end)
     end
     --- true for output fluid box index, false for input fluid box index
-    local fluid_box_index = { [true] = 1, [false] = 1 }
-    -- combine 2 input items into a single belt
-    --- @type Ingredient[][]
-    local ingredients_transport_lines = {}
-    do
-        local i = 1
-        local next_item_line = {}
-        while i <= #self.recipe.ingredients do
-            local ingredient = self.recipe.ingredients[i]
-            if ingredient.type == "fluid" then
-                ingredients_transport_lines[#ingredients_transport_lines + 1] = { ingredient }
-            else
-                next_item_line[#next_item_line + 1] = ingredient
-                if #next_item_line == 2 then
-                    ingredients_transport_lines[#ingredients_transport_lines + 1] = next_item_line
-                    next_item_line = {}
+    local fluid_box_indices = { ["output"] = 1, ["input"] = 1 }
+
+    --- @class TransportLineInfo
+    --- @field crafting_items (Product|Ingredient)[]
+    --- @field direction "input" | "output"
+    --- @field type "'fluid'" | "'item'"
+
+    --- @param recipe LuaRecipePrototype
+    --- @return TransportLineInfo[]
+    function create_transport_line_info_list(recipe)
+        --- @type TransportLineInfo[]|ArrayList
+        local item_info_list = ArrayList.new()
+        --- @type TransportLineInfo[]|ArrayList
+        local fluid_info_list = ArrayList.new()
+        -- iterate input ingredients, combine 2 input items into a single belt
+        do
+            local i = 1
+            local next_line_items = ArrayList.new()
+            while i <= #recipe.ingredients do
+                local ingredient = recipe.ingredients[i]
+                if ingredient.type == "fluid" then
+                    fluid_info_list:add { type = 'fluid', crafting_items = { ingredient }, direction = "input" }
+                else
+                    next_line_items:add(ingredient)
+                    if #next_line_items == 2 then
+                        item_info_list:add{type= "item", crafting_items = next_line_items, direction = "input"}
+                        next_line_items = ArrayList.new()
+                    end
                 end
+                i = i + 1
             end
-            i = i + 1
+            if #next_line_items > 0 then
+                item_info_list:add { type = 'item', direction = "input", crafting_items = next_line_items }
+            end
         end
-        if #next_item_line > 0 then
-            ingredients_transport_lines[#ingredients_transport_lines + 1] = next_item_line
+        -- iterate output products
+        for _, product in ipairs(recipe.products) do
+            if product.type == "item" then
+                item_info_list:add { type = "item", direction = "output", crafting_items = product }
+            else
+                fluid_info_list:add { type = "fluid", direction = "output", crafting_items = product }
+            end
         end
+        item_info_list:addAll(fluid_info_list)
+        print_log(serpent.block(item_info_list, {maxlevel = 2}))
+        return item_info_list
     end
-    --- @type Product[][] output items should stay in a single belt
-    local products_transport_lines = {}
-    for _, product in ipairs(self.recipe.products) do
-        products_transport_lines[#products_transport_lines + 1] = { product }
-    end
+
+    local transport_line_infos = create_transport_line_info_list(self.recipe)
+
     -- TODO should iterate items before fluids so that item line is closer to factory
     -- concatenate ingredients and products together
-    for is_output, transport_lines in pairs({ [false] = ingredients_transport_lines, [true] = products_transport_lines }) do
-        for _, transport_line_items in ipairs(transport_lines) do
-            local transport_line_type = transport_line_items[1].type
-            -- find next available transporting line to fill
-            for _, y in ipairs(line_check_order) do
-                local line = fulfilled_lines[y]
-                if not line[transport_line_type] then
-                    local y_closer_to_factory = y - (y > 0 and 1 or -1)
-                    local corresponding_fluid_box_position = fluid_box_positions[(is_output and "output" or "input")][fluid_box_index[is_output]]
-                    if transport_line_type == "fluid" and
-                            -- fluid box's connection position and transport line is at same side
-                            corresponding_fluid_box_position[2] * y > 0 and
-                            -- line next to factory can use pipe directly, so allowed
-                            (fulfilled_lines[y_closer_to_factory] == nil or
-                                    -- line's side towards factory will be used for underground pipe, which can't be fulfilled
-                                    not fulfilled_lines[y_closer_to_factory]["item"]) then
-                        -- different fluid line can't be neighboring each other
-                        if fulfilled_lines[y + 1] then
-                            fulfilled_lines[y + 1].fluid = true
-                        end
-                        if fulfilled_lines[y - 1] then
-                            fulfilled_lines[y - 1].fluid = true
-                        end
-                        -- fluid line's side towards factory are used for underground pipe, so can't use
-                        if fulfilled_lines[y_closer_to_factory] then
-                            fulfilled_lines[y_closer_to_factory].item = true
-                        end
-                        -- occupy this line
-                        line.item = true
-                        line.fluid = true
-                        -- populate transportation line to section
-                        for x = 0, crafter_width - 1, 1 do
-                            section:add({
-                                name = "pipe",
-                                position = { x = x, y = y },
-                                direction = defines.direction.east
-                            })
-                        end
-
-                        if fulfilled_lines[y_closer_to_factory] == nil then
-                            -- pipe line next to factory only needs one connection pipe
-                            section:add({
-                                name = "pipe",
-                                position = corresponding_fluid_box_position,
-                                direction = defines.direction.north
-                            })
-                        else
-                            -- pipe line further needs a pair of underground connection pipe
-                            section:add({
-                                name = "pipe-to-ground",
-                                position = { x = corresponding_fluid_box_position[1], y = y_closer_to_factory },
-                                direction = y > 0 and defines.direction.south or defines.direction.north
-                            })
-                            section:add({
-                                name = "pipe-to-ground",
-                                position = corresponding_fluid_box_position,
-                                direction = y > 0 and defines.direction.north or defines.direction.south
-                            })
-                        end
-                        fluid_box_index[is_output] = fluid_box_index[is_output] + 1
-                        -- TODO add connection_position
-                        break
-                    elseif transport_line_type == "item" then
-                        line.item = true
-                        line.fluid = true
-                        -- populate transportation line to section
-                        for x = 0, crafter_width - 1, 1 do
-                            section:add({
-                                name = preferred_belt.name,
-                                position = { x = x, y = y },
-                                direction = defines.direction.east
-                            })
-                        end
-                        local factory_side_y = y > 0 and crafter_height or -1
-                        local transport_line_distance = math.abs(y - factory_side_y)
-                        local inserter_type = transport_line_distance <= 1 and "inserter" or "long-handed-inserter"
-                        -- TODO should handle transport_line_distance = 3 situation
-                        -- iterate through possible positions for placing inserter
-                        for x = 0, crafter_width - 1, 1 do
-                            if not occupied_connection_positions:any(function(occupied_pos)
-                                return occupied_pos[1] == x and occupied_pos[2] == factory_side_y
-                            end) then
-                                local inserter_position = { x, factory_side_y }
-                                local to_south = (is_output and 1 or -1) * (inserter_position[2] < 0 and 1 or -1)
-                                occupied_connection_positions[#occupied_connection_positions + 1] = inserter_position
-                                section:add({
-                                    name = inserter_type,
-                                    position = inserter_position,
-                                    direction = to_south > 0 and defines.direction.south or defines.direction.north
-                                })
-                                break
-                            end
-                        end
-                        -- TODO add connection position
-                        break
+    for _, line_info in ipairs(transport_line_infos) do
+        -- find next available transporting line to fill
+        for _, y in ipairs(line_check_order) do
+            local line = fulfilled_lines[y]
+            if not line[line_info.type] then
+                local y_closer_to_factory = y - (y > 0 and 1 or -1)
+                local corresponding_fluid_box_position = fluid_box_positions[line_info.direction][fluid_box_indices[line_info.direction]]
+                if line_info.type == "fluid" and
+                        -- fluid box's connection position and transport line is at same side
+                        corresponding_fluid_box_position[2] * y > 0 and
+                        -- line next to factory can use pipe directly, so allowed
+                        (fulfilled_lines[y_closer_to_factory] == nil or
+                                -- line's side towards factory will be used for underground pipe, which can't be fulfilled
+                                not fulfilled_lines[y_closer_to_factory]["item"]) then
+                    -- different fluid line can't be neighboring each other
+                    if fulfilled_lines[y + 1] then
+                        fulfilled_lines[y + 1].fluid = true
                     end
+                    if fulfilled_lines[y - 1] then
+                        fulfilled_lines[y - 1].fluid = true
+                    end
+                    -- fluid line's side towards factory are used for underground pipe, so can't use
+                    if fulfilled_lines[y_closer_to_factory] then
+                        fulfilled_lines[y_closer_to_factory].item = true
+                    end
+                    -- occupy this line
+                    line.item = true
+                    line.fluid = true
+                    -- populate transportation line to section
+                    for x = 0, crafter_width - 1, 1 do
+                        section:add({
+                            name = "pipe",
+                            position = { x = x, y = y },
+                            direction = defines.direction.east
+                        })
+                    end
+
+                    if fulfilled_lines[y_closer_to_factory] == nil then
+                        -- pipe line next to factory only needs one connection pipe
+                        section:add({
+                            name = "pipe",
+                            position = corresponding_fluid_box_position,
+                            direction = defines.direction.north
+                        })
+                    else
+                        -- pipe line further needs a pair of underground connection pipe
+                        section:add({
+                            name = "pipe-to-ground",
+                            position = { x = corresponding_fluid_box_position[1], y = y_closer_to_factory },
+                            direction = y > 0 and defines.direction.south or defines.direction.north
+                        })
+                        section:add({
+                            name = "pipe-to-ground",
+                            position = corresponding_fluid_box_position,
+                            direction = y > 0 and defines.direction.north or defines.direction.south
+                        })
+                    end
+                    fluid_box_indices[line_info.direction] = fluid_box_indices[line_info.direction] + 1
+                    -- TODO add connection_position
+                    break
+                elseif line_info.type == "item" then
+                    line.item = true
+                    line.fluid = true
+                    -- populate transportation line to section
+                    for x = 0, crafter_width - 1, 1 do
+                        section:add({
+                            name = preferred_belt.name,
+                            position = { x = x, y = y },
+                            direction = defines.direction.east
+                        })
+                    end
+                    local factory_side_y = y > 0 and crafter_height or -1
+                    local transport_line_distance = math.abs(y - factory_side_y)
+                    local inserter_type = transport_line_distance <= 1 and "inserter" or "long-handed-inserter"
+                    -- TODO should handle transport_line_distance = 3 situation
+                    -- iterate through possible positions for placing inserter
+                    for x = 0, crafter_width - 1, 1 do
+                        if not occupied_connection_positions:any(function(occupied_pos)
+                            return occupied_pos[1] == x and occupied_pos[2] == factory_side_y
+                        end) then
+                            local inserter_position = { x, factory_side_y }
+                            local to_south = (line_info.direction == "output" and 1 or -1) * (inserter_position[2] < 0 and 1 or -1)
+                            occupied_connection_positions[#occupied_connection_positions + 1] = inserter_position
+                            section:add({
+                                name = inserter_type,
+                                position = inserter_position,
+                                direction = to_south > 0 and defines.direction.south or defines.direction.north
+                            })
+                            break
+                        end
+                    end
+                    -- TODO add connection position
+                    break
                 end
             end
         end
