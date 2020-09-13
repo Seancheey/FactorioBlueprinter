@@ -9,7 +9,7 @@ PlayerInfo.__index = PlayerInfo
 
 --- @return LuaEntityPrototype[]
 function PlayerInfo.unlocked_crafting_machines(player_index)
-    local all_factory_list = newtable()
+    local all_factory_list = toArrayList()
     for _, entity in pairs(game.get_filtered_entity_prototypes({
         { filter = "crafting-machine" },
         { filter = "hidden", invert = true, mode = "and" },
@@ -21,7 +21,7 @@ function PlayerInfo.unlocked_crafting_machines(player_index)
     local unlocked_factories = {}
     for _, factory in ipairs(all_factory_list) do
         for _, recipe in pairs(unlocked_recipes) do
-            if Table.has(recipe.products, factory, function(a, b)
+            if ArrayList.has(recipe.products, factory, function(a, b)
                 return a.name == b.name
             end) then
                 unlocked_factories[#unlocked_factories + 1] = factory
@@ -44,7 +44,7 @@ end
 
 --- @return LuaRecipePrototype[]
 function PlayerInfo.unlocked_recipes(player_index)
-    local unlocked_recipes = Table.filter(game.players[player_index].force.recipes, function(recipe)
+    local unlocked_recipes = ArrayList.filter(game.players[player_index].force.recipes, function(recipe)
         return not recipe.hidden and recipe.enabled
     end)
     return unlocked_recipes

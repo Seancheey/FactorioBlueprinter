@@ -1,4 +1,4 @@
-require("helper")
+require("util")
 require("prototype_info")
 require("player_info")
 
@@ -38,15 +38,15 @@ end
 
 function BlueprintSection:copy_with_offset(xoff, yoff)
     function shifted_entity(old)
-        local entity = Table.shallow_copy(old)
+        local entity = ArrayList.shallow_copy(old)
         entity.position.x = entity.position.x + xoff
         entity.position.y = entity.position.y + yoff
         return entity
     end
     local new_section = BlueprintSection.new()
-    new_section.entities = newtable(self.entities):map(shifted_entity)
-    new_section.inlets = newtable(self.entities):map(shifted_entity)
-    new_section.outlets = newtable(self.entities):map(shifted_entity)
+    new_section.entities = toArrayList(self.entities):map(shifted_entity)
+    new_section.inlets = toArrayList(self.entities):map(shifted_entity)
+    new_section.outlets = toArrayList(self.entities):map(shifted_entity)
 
     return new_section
 end
@@ -71,7 +71,7 @@ function BlueprintSection:concat(other, xoff, yoff)
 
     self.outlets = {}
     for _, entity in ipairs(other.entities) do
-        local new_entity = Table.shallow_copy(entity)
+        local new_entity = ArrayList.shallow_copy(entity)
         new_entity.xoff = new_entity.xoff + xoff
         new_entity.yoff = new_entity.yoff + yoff
         self.entities[#self.entities + 1] = new_entity
@@ -130,14 +130,14 @@ AssemblerNode = {}
 
 -- AssemblerNode class inherent Table class
 function AssemblerNode.__index (t, k)
-    return AssemblerNode[k] or Table[k] or t.recipe[k]
+    return AssemblerNode[k] or ArrayList[k] or t.recipe[k]
 end
 
 function AssemblerNode.new(o)
     assert(o.recipe and o.player_index)
     o.recipe_speed = o.recipe_speed or 0
-    o.targets = o.targets or newtable {}
-    o.sources = o.sources or newtable {}
+    o.targets = o.targets or toArrayList {}
+    o.sources = o.sources or toArrayList {}
     setmetatable(o, AssemblerNode)
     return o
 end
@@ -185,12 +185,12 @@ function AssemblerNode:generate_crafting_unit()
     local preferred_belt = self:get_preferred_belt()
 
     -- connection positions at sides of a factory that's been occupied by a insert or a pipe
-    local occupied_connection_positions = newtable()
+    local occupied_connection_positions = toArrayList()
 
     --- @type table<"'input'"|"output", table[]> fluid connection point positions of the crafting machine, if available
     local fluid_box_positions = {}
     for _, connection_type in ipairs({ "output", "input" }) do
-        fluid_box_positions[connection_type] = newtable(crafting_machine.fluid_boxes)
+        fluid_box_positions[connection_type] = toArrayList(crafting_machine.fluid_boxes)
                 :filter(
                 function(box)
                     local out = type(box) == "table" and box.production_type == connection_type
@@ -415,15 +415,15 @@ end
 --- @field player_index player_index
 BlueprintGraph = {}
 function BlueprintGraph.__index(t, k)
-    return BlueprintGraph[k] or Table[k] or t.dict[k]
+    return BlueprintGraph[k] or ArrayList[k] or t.dict[k]
 end
 
 --- @return BlueprintGraph
 function BlueprintGraph.new(player_index)
     o = { player_index = player_index }
-    o.inputs = newtable {}
-    o.outputs = newtable {}
-    o.dict = newtable {}
+    o.inputs = toArrayList {}
+    o.outputs = toArrayList {}
+    o.dict = toArrayList {}
     setmetatable(o, BlueprintGraph)
     return o
 end
@@ -544,9 +544,9 @@ end
 --- @return AssemblerNode[]
 function BlueprintGraph:__assemblers_whose_products_have(item_name)
     if self[item_name] then
-        return newtable { self[item_name] }
+        return toArrayList { self[item_name] }
     end
-    local out = newtable {}
+    local out = toArrayList {}
     for _, node in pairs(self.dict) do
         for _, product in pairs(node.recipe.products) do
             if product.name == item then
@@ -561,7 +561,7 @@ end
 --- @return AssemblerNode[]
 function BlueprintGraph:__assemblers_whose_ingredients_have(item_name)
     assert(self and item_name)
-    local out = newtable {}
+    local out = toArrayList {}
     if self[item_name] then
         for _, node in pairs(self[item_name].targets) do
             out[#out + 1] = node
@@ -586,7 +586,7 @@ function BlueprintGraph:__ingredient_fully_used_by(ingredient_name, item_list)
     if item_list:has(ingredient_name) then
         return true
     end
-    products = newtable {}
+    products = toArrayList {}
     for _, node in ipairs(self:__assemblers_whose_ingredients_have(ingredient_name)) do
         for _, p in ipairs(node.recipe.products) do
             products[#products + 1] = p.name
@@ -621,7 +621,7 @@ function update_player_crafting_machine_priorities(player_index)
     local factory_priority = PlayerInfo.crafting_machine_priorities(player_index)
 
     for _, unlocked_factory in ipairs(unlocked_factories) do
-        if not Table.has(factory_priority, unlocked_factory, function(a, b)
+        if not ArrayList.has(factory_priority, unlocked_factory, function(a, b)
             return a.name == b.name
         end) then
             ArrayList.insert(factory_priority, unlocked_factory)
