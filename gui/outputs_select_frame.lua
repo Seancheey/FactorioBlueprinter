@@ -106,11 +106,18 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
     local crafting_unit_tab = tab_pane.add { type = "tab", name = "crafting_unit_tab", caption = "crafting unit" }
     local crafting_unit_flow = tab_pane.add { type = "flow", name = "crafting_unit_flow", direction = "vertical" }
     do
-        crafting_unit_flow.add {name = "recipe_select_label", type = "label", caption="Choose a recipe to get a crafting blueprint"}
+        crafting_unit_flow.add { name = "recipe_select_label", type = "label", caption = "Choose a recipe to get a crafting blueprint" }
         local choose_button = crafting_unit_flow.add { name = "recipe_choose_button", type = "choose-elem-button", elem_type = "recipe" }
         register_gui_event_handler(player_index, choose_button, defines.events.on_gui_elem_changed,
                 function(e)
-                    insert_test_blueprint(e.element.elem_value, e.player_index)
+                    local recipe = game.recipe_prototypes[e.element.elem_value]
+                    local blueprint_section = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit()
+                    if blueprint_section then
+                        local blueprint = insert_blueprint(e.player_index, blueprint_section.entities)
+                        if blueprint then
+                            blueprint.label = recipe.name .. " crafting unit"
+                        end
+                    end
                     remove_gui(e.player_index, main_function_frame)
                 end
         )

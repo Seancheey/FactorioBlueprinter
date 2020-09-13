@@ -249,7 +249,7 @@ function AssemblerNode:generate_crafting_unit()
                 else
                     next_line_items:add(ingredient)
                     if #next_line_items == 2 then
-                        item_info_list:add{type= "item", crafting_items = next_line_items, direction = "input"}
+                        item_info_list:add { type = "item", crafting_items = next_line_items, direction = "input" }
                         next_line_items = ArrayList.new()
                     end
                 end
@@ -268,7 +268,7 @@ function AssemblerNode:generate_crafting_unit()
             end
         end
         item_info_list:addAll(fluid_info_list)
-        print_log(serpent.block(item_info_list, {maxlevel = 2}))
+        print_log(serpent.block(item_info_list, { maxlevel = 2 }))
         return item_info_list
     end
 
@@ -283,6 +283,11 @@ function AssemblerNode:generate_crafting_unit()
             if not line[line_info.type] then
                 local y_closer_to_factory = y - (y > 0 and 1 or -1)
                 local corresponding_fluid_box_position = fluid_box_positions[line_info.direction][fluid_box_indices[line_info.direction]]
+                -- pre-check for any crafting machine prototypes with unknown fluid box support
+                if line_info.type == "fluid" and corresponding_fluid_box_position == nil then
+                    print_log("This crafting machine has fluid connection that is not supported by the mod. Failed to make blueprint :(", logging.E)
+                    return
+                end
                 if line_info.type == "fluid" and
                         -- fluid box's connection position and transport line is at same side
                         corresponding_fluid_box_position[2] * y > 0 and
@@ -504,21 +509,10 @@ end
 
 --- insert a new blueprint item into player's inventory
 function BlueprintGraph:generate_blueprint()
-    local player_inventory = game.players[self.player_index].get_main_inventory()
-    if not player_inventory.can_insert("blueprint") then
-        print_log("player's inventory is full, can't insert a new blueprint", logging.I)
-        return
-    end
-    player_inventory.insert("blueprint")
-    for i = 1, #player_inventory, 1 do
-        if player_inventory[i].is_blueprint and not player_inventory[i].is_blueprint_setup() then
-            -- TODO use full blueprint rather then first output
-            for _, output_node in pairs(self.outputs) do
-                player_inventory[i].set_blueprint_entities(output_node:generate_section().entities)
-                break
-            end
-            break
-        end
+    -- TODO use full blueprint rather then first output
+    for _, output_node in pairs(self.outputs) do
+        insert_blueprint(self.player_index, output_node:generate_section().entities)
+        break
     end
 end
 
@@ -617,3 +611,23 @@ function BlueprintGraph:__ingredient_fully_used_by(ingredient_name, item_list)
         return self:__ingredient_fully_used_by(p, item_list)
     end)
 end
+
+--- insert an blueprint to player's inventory, fail if inventory is full
+--- @param player_index player_index
+--- @param entities Entity[]
+--- @return nil|LuaItemStack nilable, item stack representing the blueprint in the player's inventory
+function insert_blueprint(player_index, entities)
+    local player_inventory = game.players[player_index].get_main_inventory()
+    if not player_inventory.can_insert("blueprint") then
+        print_log("player's inventory is full, can't insert a new blueprint", logging.I)
+        return
+    end
+    player_inventory.insert("blueprint")
+    for i = 1, #player_inventory, 1 do
+        if player_inventory[i].is_blueprint and not player_inventory[i].is_blueprint_setup() then
+            player_inventory[i].set_blueprint_entities(entities)
+            return player_inventory[i]
+        end
+    end
+end
+
