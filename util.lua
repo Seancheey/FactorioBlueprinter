@@ -105,6 +105,17 @@ function ArrayList:map(f)
     return out
 end
 
+--- @generic T
+--- @param f function(a:T, b:T):T
+function ArrayList:reduce(f)
+    assert(self and f)
+    local val = self[1]
+    for i = 2, #self, 1 do
+        val = f(val, self[i])
+    end
+    return val
+end
+
 --- @param f function(ele: any):boolean
 --- @return ArrayList
 function ArrayList:filter(f)
