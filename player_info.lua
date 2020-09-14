@@ -123,12 +123,12 @@ function PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
     assertAllTruthy(player_index, inserter_prototype)
     --- @type LuaForce
     local force = game.players[player_index].force
-    return inserter_prototype.stack and force.stack_inserter_capacity_bonus or force.inserter_stack_size_bonus
+    return inserter_prototype.stack and (force.stack_inserter_capacity_bonus + 2) or (force.inserter_stack_size_bonus + 1)
 end
 
 --- @param inserter_prototype LuaEntityPrototype
 --- @return number number of items that the inserter can transfer per second
 function PlayerInfo.inserter_items_speed(player_index, inserter_prototype)
     assertAllTruthy(player_index, inserter_prototype)
-    return (1 / (inserter_prototype.inserter_rotation_speed * 60)) * PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
+    return (inserter_prototype.inserter_rotation_speed * 60) * PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
 end
