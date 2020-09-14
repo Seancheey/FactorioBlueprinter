@@ -104,3 +104,31 @@ function PlayerInfo.get_crafting_machine_prototype(player_index, recipe)
     print_log("no player preference matches recipe prototype, the recipe is probably uncraftable for now.", logging.D)
     return get_entity_prototype(matching_prototypes[1].name)
 end
+
+--- @return LuaTechnology[]|ArrayList
+function PlayerInfo.researched_technologies(player_index)
+    local all_technologies = game.players[player_index].force.technologies
+    local researched_technologies = ArrayList.new()
+    for _, technology in pairs(all_technologies) do
+        if technology.researched then
+            researched_technologies:add(technology)
+        end
+    end
+    return researched_technologies
+end
+
+--- @param inserter_prototype LuaEntityPrototype
+--- @return number stack size
+function PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
+    assertAllTruthy(player_index, inserter_prototype)
+    --- @type LuaForce
+    local force = game.players[player_index].force
+    return inserter_prototype.stack and force.stack_inserter_capacity_bonus or force.inserter_stack_size_bonus
+end
+
+--- @param inserter_prototype LuaEntityPrototype
+--- @return number number of items that the inserter can transfer per second
+function PlayerInfo.inserter_items_speed(player_index, inserter_prototype)
+    assertAllTruthy(player_index, inserter_prototype)
+    return (1 / (inserter_prototype.inserter_rotation_speed * 60)) * PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
+end
