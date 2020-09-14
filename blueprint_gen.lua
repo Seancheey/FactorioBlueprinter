@@ -380,6 +380,7 @@ function AssemblerNode:generate_crafting_unit()
                                 local fastest_inserter = inserter_order[#inserter_order]
                                 inserter_type = fastest_inserter.name
                                 inserter_num_need = math.ceil(required_rotation_per_sec / PlayerInfo.inserter_items_speed(self.player_index, fastest_inserter))
+                                print_log(serpent.line(line_info.crafting_items) .. " requires " .. tostring(inserter_num_need) .. " " .. fastest_inserter.name)
                             end
                         else
                             if transport_line_distance == 1 then
