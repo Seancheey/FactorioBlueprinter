@@ -108,6 +108,19 @@ function BlueprintSection:organize_entity_uid()
     end
 end
 
+--- clear overlapped units, last-in entity get saved
+function BlueprintSection:clear_overlap()
+    local position_dict = {}
+    for _, entity in pairs(self.entities) do
+        local pos = tostring(entity.position[1] or entity.position.x) .. "," .. tostring(entity.position[2] or entity.position.y)
+        position_dict[pos] = entity
+    end
+    self.entities = {}
+    for _, entity in pairs(position_dict) do
+        self:add(entity)
+    end
+end
+
 ALL_BELTS = { "transport-belt", "fast-transport-belt", "express-transport-belt" }
 INSERTER_SPEEDS = {
     ["burner-inserter"] = 0.6,
@@ -339,6 +352,8 @@ function AssemblerNode:generate_crafting_unit()
                     local factory_side_y = y > 0 and crafter_height or -1
                     --- @type string
                     local inserter_type
+                    -- number of inserter needed to full-fill ideal crafting speed, this number is not guaranteed to be in blueprint
+                    local inserter_num_need = 1
                     do
                         -- determine what kind of inserter to use for the transport line
                         local transport_line_distance = math.abs(y - factory_side_y)
@@ -354,9 +369,7 @@ function AssemblerNode:generate_crafting_unit()
                             -- use lower-level inserters if it's enough
                             local found_satisfying_inserter = false
                             for _, inserter in ipairs(inserter_order) do
-                                -- TODO take inserter stack size into consideration as well
-                                local inserter_rotation_per_sec = 1 / (inserter.inserter_rotation_speed * 60)
-                                if inserter_rotation_per_sec >= required_rotation_per_sec then
+                                if PlayerInfo.inserter_items_speed(self.player_index, inserter) >= required_rotation_per_sec then
                                     inserter_type = inserter.name
                                     found_satisfying_inserter = true
                                     break
@@ -364,7 +377,9 @@ function AssemblerNode:generate_crafting_unit()
                             end
                             -- even fastest inserter doesn't support required speed, use fastest
                             if not found_satisfying_inserter then
-                                inserter_type = inserter_order[#inserter_order].name
+                                local fastest_inserter = inserter_order[#inserter_order]
+                                inserter_type = fastest_inserter.name
+                                inserter_num_need = math.ceil(required_rotation_per_sec / PlayerInfo.inserter_items_speed(self.player_index, fastest_inserter))
                             end
                         else
                             if transport_line_distance == 1 then
@@ -382,13 +397,19 @@ function AssemblerNode:generate_crafting_unit()
                         end) then
                             local inserter_position = { x, factory_side_y }
                             local to_south = (line_info.direction == "output" and 1 or -1) * (inserter_position[2] < 0 and 1 or -1)
-                            occupied_connection_positions:add(inserter_position)
+                            -- make sure only 1 inserter is actually occupying a position, so that future inserts can still take over other spots
+                            if inserter_num_need == 1 then
+                                occupied_connection_positions:add(inserter_position)
+                            end
                             section:add({
                                 name = inserter_type,
                                 position = inserter_position,
                                 direction = to_south > 0 and defines.direction.south or defines.direction.north
                             })
-                            break
+                            inserter_num_need = inserter_num_need - 1
+                            if inserter_num_need <= 0 then
+                                break
+                            end
                         end
                     end
                     break
@@ -396,7 +417,7 @@ function AssemblerNode:generate_crafting_unit()
             end
         end
     end
-
+    section:clear_overlap()
     return section
 end
 
