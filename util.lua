@@ -64,52 +64,30 @@ function ArrayList:insert(val, pos)
 
     local i = #self + 1
     while i > p and i > 1 do
-        self[i] = self[i-1]
+        self[i] = self[i - 1]
         i = i - 1
     end
     self[p] = val
 end
 
---- @class HelperTable
 
---- @type HelperTable
-Table = {}
-Table.__index = Table
-
---- @return HelperTable
-function newtable(table)
-    return setmetatable(table or {}, Table)
-end
-
---- @return HelperTable
-function Table:keys()
-    assert(self)
-    local keyset = newtable()
-    local n = 0
-    for k, _ in pairs(self) do
-        n = n + 1
-        keyset[n] = k
+--- @param comp function(a, b):boolean element goes into the first element with true value returned
+function ArrayList:insert_by_order(val, comp)
+    assertAllTruthy(self, val, comp)
+    for i, list_val in ipairs(self) do
+        if comp(val, list_val) then
+            self:insert(val, i)
+            return
+        end
     end
-    return keyset
-end
-
---- @return HelperTable
-function Table:values()
-    assert(self)
-    local valset = newtable()
-    local n = 0
-    for _, v in pairs(self) do
-        n = n + 1
-        valset[n] = v
-    end
-    return valset
+    self:insert(val, #self + 1)
 end
 
 --- @generic T
 --- @param val T
 --- @param eq_func function(a:T, b:T):boolean
 --- @return boolean
-function Table:has(val, eq_func)
+function ArrayList:has(val, eq_func)
     assert(self and val)
     for _, test in pairs(self) do
         if eq_func and eq_func(val, test) or (val == test) then
@@ -120,21 +98,32 @@ function Table:has(val, eq_func)
 end
 
 --- @param f function(ele: any):any
---- @return HelperTable
-function Table:map(f)
+--- @return ArrayList
+function ArrayList:map(f)
     assert(self and f)
-    local out = newtable {}
+    local out = toArrayList {}
     for k, v in pairs(self) do
         out[k] = f(v)
     end
     return out
 end
 
---- @param f function(ele: any):boolean
---- @return HelperTable
-function Table:filter(f)
+--- @generic T
+--- @param f function(a:T, b:T):T
+function ArrayList:reduce(f)
     assert(self and f)
-    local out = newtable {}
+    local val = self[1]
+    for i = 2, #self, 1 do
+        val = f(val, self[i])
+    end
+    return val
+end
+
+--- @param f function(ele: any):boolean
+--- @return ArrayList
+function ArrayList:filter(f)
+    assert(self and f)
+    local out = toArrayList {}
     local i = 1
     for _, v in pairs(self) do
         if f(v) then
@@ -147,11 +136,11 @@ end
 
 --- @param f function(ele: any):boolean
 --- @return boolean
-function Table:all(f)
+function ArrayList:all(f)
+    assert(self and f)
     f = f or function(x)
         return x
     end
-    assert(self and f)
     for _, v in pairs(self) do
         if not f(v) then
             return false
@@ -162,7 +151,7 @@ end
 
 --- @param f function(ele: any):boolean
 --- @return boolean
-function Table:any(f)
+function ArrayList:any(f)
     f = f or function(x)
         return x
     end
@@ -175,7 +164,7 @@ function Table:any(f)
     return false
 end
 
-function Table:tostring()
+function ArrayList:tostring()
     local keys = ""
     for k, v in pairs(self) do
         keys = keys .. tostring(k) .. ": " .. tostring(v) .. ","
@@ -184,12 +173,19 @@ function Table:tostring()
     return keys
 end
 
-function Table:shallow_copy()
-    local out = newtable {}
+function ArrayList:shallow_copy()
+    local out = toArrayList {}
     for k, v in pairs(self) do
         out[k] = v
     end
     return out
+end
+
+--- @generic T
+--- @param table T
+--- @return ArrayList|T
+function toArrayList(table)
+    return setmetatable(table or {}, ArrayList)
 end
 
 function sprite_of(name)

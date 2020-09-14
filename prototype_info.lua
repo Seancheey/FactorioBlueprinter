@@ -75,7 +75,7 @@ local prototype_addition = {
 }
 
 --- fields that allows prototype.field == nil to exist.
-local nullable_fields = newtable({ "fluid_boxes" })
+local nullable_fields = toArrayList({ "fluid_boxes" })
 
 --- @return any an entity prototype with additional information if available
 function get_entity_prototype(name)

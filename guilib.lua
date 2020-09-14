@@ -1,4 +1,4 @@
-require("helper")
+require("util")
 
 guilib_listening_events = {
     defines.events.on_gui_click,

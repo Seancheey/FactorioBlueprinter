@@ -87,7 +87,7 @@ end
 
 local function create_outputs_select_tab(player_index, tab_pane)
     --- @type OutputSpec[] player's specified blueprint outputs
-    local output_specifications = newtable {}
+    local output_specifications = toArrayList {}
 
     local output_tab = tab_pane.add { type = "tab", name = "outputs_tab", caption = "whole factory" }
     local output_flow = tab_pane.add { type = "flow", name = "output_flow", direction = "vertical" }

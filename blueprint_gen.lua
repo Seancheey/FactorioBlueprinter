@@ -1,5 +1,6 @@
-require("helper")
+require("util")
 require("prototype_info")
+require("player_info")
 
 --- @alias recipe_name string
 --- @alias ingredient_name string
@@ -37,15 +38,15 @@ end
 
 function BlueprintSection:copy_with_offset(xoff, yoff)
     function shifted_entity(old)
-        local entity = Table.shallow_copy(old)
+        local entity = ArrayList.shallow_copy(old)
         entity.position.x = entity.position.x + xoff
         entity.position.y = entity.position.y + yoff
         return entity
     end
     local new_section = BlueprintSection.new()
-    new_section.entities = newtable(self.entities):map(shifted_entity)
-    new_section.inlets = newtable(self.entities):map(shifted_entity)
-    new_section.outlets = newtable(self.entities):map(shifted_entity)
+    new_section.entities = toArrayList(self.entities):map(shifted_entity)
+    new_section.inlets = toArrayList(self.entities):map(shifted_entity)
+    new_section.outlets = toArrayList(self.entities):map(shifted_entity)
 
     return new_section
 end
@@ -70,7 +71,7 @@ function BlueprintSection:concat(other, xoff, yoff)
 
     self.outlets = {}
     for _, entity in ipairs(other.entities) do
-        local new_entity = Table.shallow_copy(entity)
+        local new_entity = ArrayList.shallow_copy(entity)
         new_entity.xoff = new_entity.xoff + xoff
         new_entity.yoff = new_entity.yoff + yoff
         self.entities[#self.entities + 1] = new_entity
@@ -129,14 +130,14 @@ AssemblerNode = {}
 
 -- AssemblerNode class inherent Table class
 function AssemblerNode.__index (t, k)
-    return AssemblerNode[k] or Table[k] or t.recipe[k]
+    return AssemblerNode[k] or ArrayList[k] or t.recipe[k]
 end
 
 function AssemblerNode.new(o)
     assert(o.recipe and o.player_index)
     o.recipe_speed = o.recipe_speed or 0
-    o.targets = o.targets or newtable {}
-    o.sources = o.sources or newtable {}
+    o.targets = o.targets or toArrayList {}
+    o.sources = o.sources or toArrayList {}
     setmetatable(o, AssemblerNode)
     return o
 end
@@ -149,9 +150,12 @@ end
 --- @return BlueprintSection
 function AssemblerNode:generate_crafting_unit()
     local section = BlueprintSection.new()
-    local crafting_machine = self:get_crafting_machine_prototype()
+    local crafting_machine = PlayerInfo.get_crafting_machine_prototype(self.player_index, self.recipe)
+    local available_inserters = PlayerInfo.unlocked_inserters(self.player_index)
     local crafter_width = math.ceil(crafting_machine.selection_box.right_bottom.x - crafting_machine.selection_box.left_top.x)
     local crafter_height = math.ceil(crafting_machine.selection_box.right_bottom.y - crafting_machine.selection_box.left_top.y)
+    --- ideal crafting speed of the recipe, unit is recipe/second
+    local ideal_crafting_speed = crafting_machine.crafting_speed / self.recipe.energy
 
     section:add({
         -- set top-left corner of crafting machine to 0,0
@@ -183,13 +187,13 @@ function AssemblerNode:generate_crafting_unit()
     -- populate actual transporting lines for each ingredient
     local preferred_belt = self:get_preferred_belt()
 
-    -- connection positions at sides of a factory that's been occupied by a insert or a pipe
-    local occupied_connection_positions = newtable()
+    --- @type number[][]|ArrayList connection positions at sides of a factory that's been occupied by a insert or a pipe
+    local occupied_connection_positions = toArrayList()
 
-    --- @type table<"'input'"|"output", table[]> fluid connection point positions of the crafting machine, if available
+    --- @type table<'"input"'|'"output"', table[]> fluid connection point positions of the crafting machine, if available
     local fluid_box_positions = {}
     for _, connection_type in ipairs({ "output", "input" }) do
-        fluid_box_positions[connection_type] = newtable(crafting_machine.fluid_boxes)
+        fluid_box_positions[connection_type] = toArrayList(crafting_machine.fluid_boxes)
                 :filter(
                 function(box)
                     local out = type(box) == "table" and box.production_type == connection_type
@@ -201,7 +205,7 @@ function AssemblerNode:generate_crafting_unit()
                         b.pipe_connections[1].position[1] + math.floor(crafter_width / 2),
                         b.pipe_connections[1].position[2] + math.floor(crafter_height / 2)
                     }
-                    occupied_connection_positions[#occupied_connection_positions + 1] = connection_position
+                    occupied_connection_positions:add(connection_position)
                     return connection_position
                 end)
     end
@@ -255,7 +259,6 @@ function AssemblerNode:generate_crafting_unit()
 
     local transport_line_infos = create_transport_line_info_list(self.recipe)
 
-    -- TODO should iterate items before fluids so that item line is closer to factory
     -- concatenate ingredients and products together
     for _, line_info in ipairs(transport_line_infos) do
         -- find next available transporting line to fill
@@ -321,7 +324,6 @@ function AssemblerNode:generate_crafting_unit()
                         })
                     end
                     fluid_box_indices[line_info.direction] = fluid_box_indices[line_info.direction] + 1
-                    -- TODO add connection_position
                     break
                 elseif line_info.type == "item" then
                     line.item = true
@@ -335,9 +337,44 @@ function AssemblerNode:generate_crafting_unit()
                         })
                     end
                     local factory_side_y = y > 0 and crafter_height or -1
-                    local transport_line_distance = math.abs(y - factory_side_y)
-                    local inserter_type = transport_line_distance <= 1 and "inserter" or "long-handed-inserter"
-                    -- TODO should handle transport_line_distance = 3 situation
+                    --- @type string
+                    local inserter_type
+                    do
+                        -- determine what kind of inserter to use for the transport line
+                        local transport_line_distance = math.abs(y - factory_side_y)
+                        -- TODO should handle transport_line_distance = 3 situation
+                        transport_line_distance = (transport_line_distance <= 1) and 1 or 2
+                        local inserter_order = available_inserters[transport_line_distance]
+                        if inserter_order then
+                            local required_rotation_per_sec = 0
+                            for _, crafting_item in ipairs(line_info.crafting_items) do
+                                local avg_amount = crafting_item.amount and crafting_item.amount or ((crafting_item.amount_max + crafting_item.amount_min) / 2)
+                                required_rotation_per_sec = required_rotation_per_sec + avg_amount * ideal_crafting_speed
+                            end
+                            -- use lower-level inserters if it's enough
+                            local found_satisfying_inserter = false
+                            for _, inserter in ipairs(inserter_order) do
+                                -- TODO take inserter stack size into consideration as well
+                                local inserter_rotation_per_sec = 1 / (inserter.inserter_rotation_speed * 60)
+                                if inserter_rotation_per_sec >= required_rotation_per_sec then
+                                    inserter_type = inserter.name
+                                    found_satisfying_inserter = true
+                                    break
+                                end
+                            end
+                            -- even fastest inserter doesn't support required speed, use fastest
+                            if not found_satisfying_inserter then
+                                inserter_type = inserter_order[#inserter_order].name
+                            end
+                        else
+                            if transport_line_distance == 1 then
+                                inserter_type = "inserter"
+                            else
+                                game.players[self.player_index].print("fail to find an unlocked inserter with arm length " .. transport_line_distance .. ", use long handed inserter instead")
+                                inserter_type = "long-handed-inserter"
+                            end
+                        end
+                    end
                     -- iterate through possible positions for placing inserter
                     for x = 0, crafter_width - 1, 1 do
                         if not occupied_connection_positions:any(function(occupied_pos)
@@ -345,7 +382,7 @@ function AssemblerNode:generate_crafting_unit()
                         end) then
                             local inserter_position = { x, factory_side_y }
                             local to_south = (line_info.direction == "output" and 1 or -1) * (inserter_position[2] < 0 and 1 or -1)
-                            occupied_connection_positions[#occupied_connection_positions + 1] = inserter_position
+                            occupied_connection_positions:add(inserter_position)
                             section:add({
                                 name = inserter_type,
                                 position = inserter_position,
@@ -354,7 +391,6 @@ function AssemblerNode:generate_crafting_unit()
                             break
                         end
                     end
-                    -- TODO add connection position
                     break
                 end
             end
@@ -373,35 +409,6 @@ function AssemblerNode:generate_section()
     return self:generate_crafting_unit()
 end
 
---- get a crafting machine prototype that user preferred
---- @return any crafting machine prototype
-function AssemblerNode:get_crafting_machine_prototype()
-    -- get all crafting machines
-    local filter = { filter = "crafting-machine" }
-    local crafting_machines = game.get_filtered_entity_prototypes({ filter })
-    -- get recipe category
-    local recipe_category = self.recipe.category
-    -- match category
-    local matching_prototypes = {}
-    for _, prototype in pairs(crafting_machines) do
-        if prototype.crafting_categories[recipe_category] ~= nil then
-            matching_prototypes[#matching_prototypes + 1] = prototype
-        end
-    end
-
-    -- select first preferred
-    for _, crafting_machine in ipairs(global.settings[self.player_index].factory_priority) do
-        for _, matching_prototype in ipairs(matching_prototypes) do
-            if crafting_machine.name == matching_prototype.name then
-                return get_entity_prototype(matching_prototype.name)
-            end
-        end
-    end
-    -- if there is no player preference, select first available
-    print_log("no player preference matches recipe prototype, the recipe is probably uncraftable for now.", logging.D)
-    return get_entity_prototype(matching_prototypes[1].name)
-end
-
 --- @return LuaRecipePrototype belt prototype
 function AssemblerNode:get_preferred_belt()
     return game.recipe_prototypes[ALL_BELTS[global.settings[self.player_index].belt]]
@@ -414,15 +421,15 @@ end
 --- @field player_index player_index
 BlueprintGraph = {}
 function BlueprintGraph.__index(t, k)
-    return BlueprintGraph[k] or Table[k] or t.dict[k]
+    return BlueprintGraph[k] or ArrayList[k] or t.dict[k]
 end
 
 --- @return BlueprintGraph
 function BlueprintGraph.new(player_index)
     o = { player_index = player_index }
-    o.inputs = newtable {}
-    o.outputs = newtable {}
-    o.dict = newtable {}
+    o.inputs = toArrayList {}
+    o.outputs = toArrayList {}
+    o.dict = toArrayList {}
     setmetatable(o, BlueprintGraph)
     return o
 end
@@ -543,9 +550,9 @@ end
 --- @return AssemblerNode[]
 function BlueprintGraph:__assemblers_whose_products_have(item_name)
     if self[item_name] then
-        return newtable { self[item_name] }
+        return toArrayList { self[item_name] }
     end
-    local out = newtable {}
+    local out = toArrayList {}
     for _, node in pairs(self.dict) do
         for _, product in pairs(node.recipe.products) do
             if product.name == item then
@@ -560,7 +567,7 @@ end
 --- @return AssemblerNode[]
 function BlueprintGraph:__assemblers_whose_ingredients_have(item_name)
     assert(self and item_name)
-    local out = newtable {}
+    local out = toArrayList {}
     if self[item_name] then
         for _, node in pairs(self[item_name].targets) do
             out[#out + 1] = node
@@ -585,7 +592,7 @@ function BlueprintGraph:__ingredient_fully_used_by(ingredient_name, item_list)
     if item_list:has(ingredient_name) then
         return true
     end
-    products = newtable {}
+    products = toArrayList {}
     for _, node in ipairs(self:__assemblers_whose_ingredients_have(ingredient_name)) do
         for _, p in ipairs(node.recipe.products) do
             products[#products + 1] = p.name
@@ -601,6 +608,8 @@ end
 --- @param entities Entity[]
 --- @return nil|LuaItemStack nilable, item stack representing the blueprint in the player's inventory
 function insert_blueprint(player_index, entities)
+    assertAllTruthy(player_index, entities)
+
     local player_inventory = game.players[player_index].get_main_inventory()
     if not player_inventory.can_insert("blueprint") then
         print_log("player's inventory is full, can't insert a new blueprint", logging.I)
@@ -608,47 +617,20 @@ function insert_blueprint(player_index, entities)
     end
     player_inventory.insert("blueprint")
     for i = 1, #player_inventory, 1 do
-        if player_inventory[i].is_blueprint and not player_inventory[i].is_blueprint_setup() then
-            player_inventory[i].set_blueprint_entities(entities)
-            return player_inventory[i]
+        local item = player_inventory[i]
+        if item.is_blueprint and not item.is_blueprint_setup() then
+            item.set_blueprint_entities(entities)
+            return item
         end
     end
 end
 
 function update_player_crafting_machine_priorities(player_index)
-    --- @return HelperTable|LuaEntityPrototype[]
-    local function all_factories()
-        local factories = newtable()
-        for _, entity in pairs(game.get_filtered_entity_prototypes({
-            { filter = "crafting-machine" },
-            { filter = "hidden", invert = true, mode = "and" },
-            { filter = "blueprintable", mode = "and" } })) do
-            factories[#factories + 1] = entity
-        end
-        return factories
-    end
-    --- @type LuaRecipePrototype[]|ArrayList
-    local unlocked_recipes = Table.filter(game.players[player_index].force.recipes, function(recipe)
-        return not recipe.hidden and recipe.enabled
-    end)
-
-    local all_factory_list = all_factories()
-    local unlocked_factories = {}
-    for _, factory in ipairs(all_factory_list) do
-        for _, recipe in pairs(unlocked_recipes) do
-            if Table.has(recipe.products, factory, function(a, b)
-                return a.name == b.name
-            end) then
-                unlocked_factories[#unlocked_factories + 1] = recipe
-                break
-            end
-        end
-    end
-
-    local factory_priority = global.settings[player_index].factory_priority
+    local unlocked_factories = PlayerInfo.unlocked_crafting_machines(player_index)
+    local factory_priority = PlayerInfo.crafting_machine_priorities(player_index)
 
     for _, unlocked_factory in ipairs(unlocked_factories) do
-        if not Table.has(factory_priority, unlocked_factory, function(a, b)
+        if not ArrayList.has(factory_priority, unlocked_factory, function(a, b)
             return a.name == b.name
         end) then
             ArrayList.insert(factory_priority, unlocked_factory)
