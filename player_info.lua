@@ -37,16 +37,43 @@ function PlayerInfo.unlocked_belts(player_index)
 
 end
 
---- @return LuaEntityPrototype[]
+--- @return table<number, LuaEntityPrototype[]> inserters table, keyed by insert arm length, list is ordered by inserter speed, ascending, this list doesn't contain any filter inserter since we are not using them anyway
 function PlayerInfo.unlocked_inserters(player_index)
-
+    --- @type LuaEntityPrototype[]
+    local inserter_list = toArrayList(PlayerInfo.unlocked_recipes(player_index)):filter(function(recipe)
+        return game.entity_prototypes[recipe.name] and game.entity_prototypes[recipe.name].inserter_rotation_speed ~= nil and game.entity_prototypes[recipe.name].filter_count == 0
+    end)                                                                        :map(function(recipe)
+        return game.entity_prototypes[recipe.name]
+    end)
+    local sorted_lists = toArrayList()
+    for _, inserter in ipairs(inserter_list) do
+        local pickup_location = inserter.inserter_pickup_position
+        print_log(serpent.line(pickup_location))
+        local inserter_arm_length = math.max(math.floor(math.abs(pickup_location[1])), math.floor(math.abs(pickup_location[2])))
+        if not sorted_lists[inserter_arm_length] then
+            sorted_lists[inserter_arm_length] = toArrayList()
+        end
+        sorted_lists[inserter_arm_length]:insert_by_order(inserter, function(a, b)
+            return a.inserter_rotation_speed < b.inserter_rotation_speed
+        end)
+    end
+    print_log(serpent.block(sorted_lists:map(function(list)
+        return list:map(function(inserter)
+            return { name = inserter.name, filter_count = inserter.filter_count }
+        end)
+    end)))
+    return sorted_lists
 end
 
 --- @return LuaRecipePrototype[]
 function PlayerInfo.unlocked_recipes(player_index)
-    local unlocked_recipes = ArrayList.filter(game.players[player_index].force.recipes, function(recipe)
-        return not recipe.hidden and recipe.enabled
-    end)
+    assertAllTruthy(player_index)
+
+    local all_recipes = game.get_player(player_index).force.recipes
+    local unlocked_recipes = ArrayList.filter(all_recipes,
+            function(recipe)
+                return not recipe.hidden and recipe.enabled
+            end)
     return unlocked_recipes
 end
 

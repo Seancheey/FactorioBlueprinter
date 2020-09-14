@@ -67,6 +67,19 @@ function ArrayList:insert(val, pos)
     self[p] = val
 end
 
+
+--- @param comp function(a, b):boolean element goes into the first element with true value returned
+function ArrayList:insert_by_order(val, comp)
+    assertAllTruthy(self, val, comp)
+    for i, list_val in ipairs(self) do
+        if comp(val, list_val) then
+            self:insert(val, i)
+            return
+        end
+    end
+    self:insert(val, #self + 1)
+end
+
 --- @generic T
 --- @param val T
 --- @param eq_func function(a:T, b:T):boolean
