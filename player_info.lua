@@ -132,3 +132,20 @@ function PlayerInfo.inserter_items_speed(player_index, inserter_prototype)
     assertAllTruthy(player_index, inserter_prototype)
     return (inserter_prototype.inserter_rotation_speed * 60) * PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
 end
+
+--- @return defines.direction
+function PlayerInfo.get_belt_direction(player_index)
+    return global.settings[player_index].belt_direction or defines.direction.east
+end
+
+function PlayerInfo.set_belt_direction(player_index, direction)
+    global.settings[player_index].belt_direction = direction
+end
+
+function PlayerInfo.set_default_settings(player_index)
+    global.settings[player_index] = {
+        belt = 1,
+        factory_priority = {},
+        belt_direction = defines.direction.east
+    }
+end
