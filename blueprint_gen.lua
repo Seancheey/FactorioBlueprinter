@@ -169,6 +169,7 @@ function AssemblerNode:generate_crafting_unit()
     local crafter_height = math.ceil(crafting_machine.selection_box.right_bottom.y - crafting_machine.selection_box.left_top.y)
     --- ideal crafting speed of the recipe, unit is recipe/second
     local ideal_crafting_speed = crafting_machine.crafting_speed / self.recipe.energy
+    local belt_direction = PlayerInfo.get_belt_direction(self.player_index)
 
     section:add({
         -- set top-left corner of crafting machine to 0,0
@@ -312,7 +313,7 @@ function AssemblerNode:generate_crafting_unit()
                         section:add({
                             name = "pipe",
                             position = { x = x, y = y },
-                            direction = defines.direction.east
+                            direction = belt_direction
                         })
                     end
 
@@ -346,7 +347,7 @@ function AssemblerNode:generate_crafting_unit()
                         section:add({
                             name = preferred_belt.name,
                             position = { x = x, y = y },
-                            direction = defines.direction.east
+                            direction = belt_direction
                         })
                     end
                     local factory_side_y = y > 0 and crafter_height or -1
@@ -492,13 +493,12 @@ function BlueprintGraph:use_products_as_input(item_name)
     local to_remove = {}
     for input_name, input_node in pairs(self.inputs) do
         others[input_name] = nil
-        if self:__ingredient_fully_used_by(input_name, others:keys()) then
+        if self:__ingredient_fully_used_by(input_name, ArrayList.fromKeys(others)) then
             to_remove[input_name] = input_node
         end
         others[input_name] = input_node
     end
     for input_name, _ in pairs(to_remove) do
-        --debug_print(input_name.." is covered")
         self.inputs[input_name] = nil
     end
 end

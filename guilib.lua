@@ -62,6 +62,10 @@ function start_listening_events()
 end
 
 --- register a *handler* that handles *event* for gui element *gui_elem* of player with *player_index*
+--- @param player_index number
+--- @param gui_elem LuaGuiElement
+--- @param event defines.events
+--- @param handler function(e)
 function register_gui_event_handler(player_index, gui_elem, event, handler)
     assertAllTruthy(player_index, gui_elem, event, handler)
     assert(type(handler) == "function", "handler should be a function")

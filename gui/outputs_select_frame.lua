@@ -103,11 +103,34 @@ local function create_outputs_select_tab(player_index, tab_pane)
     tab_pane.add_tab(output_tab, output_flow)
 end
 
+--- @param tab_pane LuaGuiElement
 local function create_crafting_unit_select_tab(player_index, tab_pane)
     local crafting_unit_tab = tab_pane.add { type = "tab", name = "crafting_unit_tab", caption = "crafting unit" }
     local crafting_unit_flow = tab_pane.add { type = "flow", name = "crafting_unit_flow", direction = "vertical" }
     do
-        crafting_unit_flow.add { name = "recipe_select_label", type = "label", caption = "Choose a recipe to get a crafting blueprint" }
+        crafting_unit_flow.add { name = "belt_direction_label", type = "label", caption = "Select crafting unit's belt direction:" }
+        local belt_direction_table = crafting_unit_flow.add { name = "belt_direction_table", type = "table", column_count = 4 }
+        do
+            local belt_direction_preference = PlayerInfo.get_belt_direction(player_index)
+            belt_direction_table.add { name = "left_label", type = "label", caption = "left" }
+            local left_button = belt_direction_table.add { name = "left_button", type = "radiobutton", state = belt_direction_preference == defines.direction.west }
+
+            belt_direction_table.add { name = "right_label", type = "label", caption = "right" }
+            local right_button = belt_direction_table.add { name = "right_button", type = "radiobutton", state = belt_direction_preference == defines.direction.east }
+
+            register_gui_event_handler(player_index, left_button, defines.events.on_gui_click, function(e)
+                left_button.state = true
+                right_button.state = false
+                PlayerInfo.set_belt_direction(e.player_index, defines.direction.west)
+            end)
+
+            register_gui_event_handler(player_index, right_button, defines.events.on_gui_click, function(e)
+                left_button.state = false
+                right_button.state = true
+                PlayerInfo.set_belt_direction(e.player_index, defines.direction.east)
+            end)
+        end
+        crafting_unit_flow.add { name = "recipe_select_label", type = "label", caption = "Select your new crafting unit's recipe:" }
         local choose_button = crafting_unit_flow.add { name = "recipe_choose_button", type = "choose-elem-button", elem_type = "recipe", elem_filters = {
             enabled = true
         } }
@@ -125,6 +148,7 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
                     remove_gui(e.player_index, main_function_frame)
                 end
         )
+
     end
     tab_pane.add_tab(crafting_unit_tab, crafting_unit_flow)
 end
