@@ -59,6 +59,9 @@ function ArrayList:add(val)
     return self
 end
 
+--- @generic T
+--- @param table table<any, T>|T[]
+--- @return ArrayList|T[]
 function ArrayList:addAll(table)
     assertAllTruthy(self, table)
 

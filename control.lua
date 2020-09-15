@@ -8,26 +8,23 @@ require("test")
 
 --- @alias player_index number
 
-
 -- initialize global data as empty if they are nil
 -- Note that global data cannot be metatable
 function init_all_global()
-    --- @class PlayerSetting
-    --- @field factory_priority LuaEntityPrototype[] factory prototype
-    --- @field belt number
     --- @type table<player_index, PlayerSetting>
     global.settings = global.settings or {}
 end
 
-function default_player_settings()
-    return {
-        belt = 1,
-        factory_priority = {}
-    }
-end
+--- @class PlayerSetting
+--- @field factory_priority LuaEntityPrototype[] factory prototype
+--- @field belt number
+--- @field belt_direction defines.direction a direction
+--- @return PlayerSetting
 
 function init_player_mod(player_index)
-    global.settings[player_index] = global.settings[player_index] or default_player_settings()
+    if not global.settings[player_index] then
+        PlayerInfo.set_default_settings(player_index)
+    end
     init_player_gui(player_index)
 end
 
@@ -45,9 +42,10 @@ script.on_event(defines.events.on_player_joined_game, function(e)
     init_player_mod(e.player_index)
 end)
 
-script.on_configuration_changed(function ()
+script.on_configuration_changed(function()
+    print_log("configuration changed, reset default settings")
     for player_index, _ in ipairs(global.settings) do
-        global.settings[player_index] = default_player_settings()
+        PlayerInfo.set_default_settings(player_index)
     end
 end)
 
