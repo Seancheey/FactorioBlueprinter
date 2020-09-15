@@ -31,7 +31,11 @@ end
 
 -- Only called when starting a new game / loading a game without this mod
 script.on_init(function()
+    print_log("initialize game")
     init_all_global()
+    for _, player in pairs(game.players) do
+        init_player_mod(player.index)
+    end
 end)
 
 -- Besides when on_init, Called everytime the script is loaded
@@ -39,6 +43,7 @@ script.on_load(function()
 end)
 
 script.on_event(defines.events.on_player_joined_game, function(e)
+    print_log("player joined game, initialize mod")
     init_player_mod(e.player_index)
 end)
 
@@ -46,6 +51,7 @@ script.on_configuration_changed(function()
     print_log("configuration changed, reset default settings")
     for player_index, _ in ipairs(global.settings) do
         PlayerInfo.set_default_settings(player_index)
+        init_player_mod(player_index)
     end
 end)
 
