@@ -492,13 +492,12 @@ function BlueprintGraph:use_products_as_input(item_name)
     local to_remove = {}
     for input_name, input_node in pairs(self.inputs) do
         others[input_name] = nil
-        if self:__ingredient_fully_used_by(input_name, others:keys()) then
+        if self:__ingredient_fully_used_by(input_name, ArrayList.fromKeys(others)) then
             to_remove[input_name] = input_node
         end
         others[input_name] = input_node
     end
     for input_name, _ in pairs(to_remove) do
-        --debug_print(input_name.." is covered")
         self.inputs[input_name] = nil
     end
 end

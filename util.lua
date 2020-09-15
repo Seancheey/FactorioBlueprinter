@@ -37,6 +37,19 @@ function ArrayList.new(list)
     return o
 end
 
+--- @generic T
+--- @param table table<T, any>
+--- @return T[]|ArrayList
+function ArrayList.fromKeys(table)
+    assert(table)
+
+    local o = setmetatable({}, ArrayList)
+    for k, _ in pairs(table) do
+        o:add(k)
+    end
+    return o
+end
+
 --- @generic T: self
 --- @param val T
 function ArrayList:add(val)
@@ -66,7 +79,6 @@ function ArrayList:insert(val, pos)
     end
     self[p] = val
 end
-
 
 --- @param comp function(a, b):boolean element goes into the first element with true value returned
 function ArrayList:insert_by_order(val, comp)
