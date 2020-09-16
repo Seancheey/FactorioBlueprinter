@@ -50,15 +50,15 @@ local prototype_addition = {
     ["oil-refinery"] = {
         fluid_boxes = {
             {
-                pipe_connections = { { position = { -1, 3 }, type = "input" } },
-                production_type = "input"
-            },
-            {
                 pipe_connections = { { position = { 1, 3 }, type = "input" } },
                 production_type = "input"
             },
             {
-                pipe_connections = { { position = { -2, -3 } } },
+                pipe_connections = { { position = { -1, 3 }, type = "input" } },
+                production_type = "input"
+            },
+            {
+                pipe_connections = { { position = { 2, -3 } } },
                 production_type = "output"
             },
             {
@@ -66,7 +66,7 @@ local prototype_addition = {
                 production_type = "output"
             },
             {
-                pipe_connections = { { position = { 2, -3 } } },
+                pipe_connections = { { position = { -2, -3 } } },
                 production_type = "output"
             }
         },
