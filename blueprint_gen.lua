@@ -16,7 +16,7 @@ require("player_info")
 --- @field direction any defines.direction.east/south/west/north
 
 --- @class ConnectionPoint
---- @field ingredients ingredient_name[] ingredients that the connection point is transporting
+--- @field ingredients table<ingredient_name, number> ingredients that the connection point is transporting to number of items transported per second
 --- @field entity Entity
 
 --- @class BlueprintSection
@@ -28,10 +28,17 @@ require("player_info")
 BlueprintSection = {}
 BlueprintSection.__index = BlueprintSection
 
+--- @return Coordinate a comparable coordinate object
+function Coordinate(x, y)
+    return setmetatable({ x = x, y = y }, { __eq = function(ca, cb)
+        return ca.x == cb.x and ca.y == cb.y
+    end })
+end
+
 --- @return BlueprintSection
 function BlueprintSection.new()
     --- @type BlueprintSection
-    o = { entities = {}, inlets = {}, outlets = {} }
+    o = { entities = toArrayList {}, inlets = toArrayList {}, outlets = toArrayList {} }
     setmetatable(o, BlueprintSection)
     return o
 end
@@ -74,7 +81,7 @@ function BlueprintSection:concat(other, xoff, yoff)
         local new_entity = ArrayList.shallow_copy(entity)
         new_entity.xoff = new_entity.xoff + xoff
         new_entity.yoff = new_entity.yoff + yoff
-        self.entities[#self.entities + 1] = new_entity
+        self.entities:add(new_entity)
         for _, connection in ipairs(other.outlets) do
             if connection.entity == entity then
                 self.outlets[#self.outlets + 1] = { entity = new_entity, ingredients = connection.ingredients }
