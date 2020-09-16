@@ -17,7 +17,8 @@ require("player_info")
 
 --- @class ConnectionPoint
 --- @field ingredients table<ingredient_name, number> ingredients that the connection point is transporting to number of items transported per second
---- @field entity Entity
+--- @field position Coordinate
+--- @field connection_entity LuaEntityPrototype
 
 --- @class BlueprintSection
 --- @field entities Entity[]
@@ -153,6 +154,10 @@ function AssemblerNode.__index (t, k)
     return AssemblerNode[k] or ArrayList[k] or t.recipe[k]
 end
 
+function AssemblerNode.__tostring()
+    return serpent.line(self)
+end
+
 function AssemblerNode.new(o)
     assert(o.recipe and o.player_index)
     o.recipe_speed = o.recipe_speed or 0
@@ -160,10 +165,6 @@ function AssemblerNode.new(o)
     o.sources = o.sources or toArrayList {}
     setmetatable(o, AssemblerNode)
     return o
-end
-
-function AssemblerNode:tostring()
-    return "{" .. self.recipe .. "  sources:" .. self.sources:keys():tostring() .. ", targets:" .. self.targets:keys():tostring() .. "}"
 end
 
 --- generate a blueprint section with a single crafting machine unit
@@ -206,12 +207,35 @@ function AssemblerNode:generate_crafting_unit()
     end
 
     -- populate actual transporting lines for each ingredient
-    local preferred_belt = self:get_preferred_belt()
+    local preferred_belt = PlayerInfo.get_preferred_belt(self.player_index)
+    --- @class ConnectionSpec
+    --- @field replaceable boolean required, if this connection point could be replaced by others
+    --- @field entity LuaEntityPrototype nullable, inserter/pipe prototype
+    --- @field direction defines.direction nullable, inserter/pipe direction
+    --- @field transport_line_y number the connection point's corresponding transport line
+    --- @field line_info TransportLineInfo transport line information
 
-    --- @type number[][]|ArrayList connection positions at sides of a factory that's been occupied by a insert or a pipe
-    local occupied_connection_positions = toArrayList()
+    --- @type table<Coordinate, ConnectionSpec> connection entity specification table which is keyed by its coordinate
+    local connection_positions = setmetatable({}, { __index = function(t, k)
+        for test_key, v in pairs(t) do
+            if test_key == k then
+                return v
+            end
+        end
+    end
+    })
+    do
+        -- populate all connection positions
+        for _, y in ipairs({ -1, crafter_height }) do
+            for x = 0, crafter_width - 1, 1 do
+                connection_positions[Coordinate(x, y)] = {
+                    replaceable = true
+                }
+            end
+        end
+    end
 
-    --- @type table<'"input"'|'"output"', table[]> fluid connection point positions of the crafting machine, if available
+    --- @type table<'"input"'|'"output"', ArrayList|Coordinate[]> fluid connection point positions of the crafting machine, if available
     local fluid_box_positions = {}
     for _, connection_type in ipairs({ "output", "input" }) do
         fluid_box_positions[connection_type] = toArrayList(crafting_machine.fluid_boxes)
@@ -222,11 +246,12 @@ function AssemblerNode:generate_crafting_unit()
                 end)
                 :map(
                 function(b)
-                    local connection_position = {
-                        b.pipe_connections[1].position[1] + math.floor(crafter_width / 2),
-                        b.pipe_connections[1].position[2] + math.floor(crafter_height / 2)
-                    }
-                    occupied_connection_positions:add(connection_position)
+                    local connection_position = Coordinate(
+                            b.pipe_connections[1].position[1] + math.floor(crafter_width / 2),
+                            b.pipe_connections[1].position[2] + math.floor(crafter_height / 2)
+                    )
+                    -- fill position with fluid box, so that inserters can't occupy this position
+                    connection_positions[connection_position].replaceable = false
                     return connection_position
                 end)
     end
@@ -235,8 +260,8 @@ function AssemblerNode:generate_crafting_unit()
 
     --- @class TransportLineInfo
     --- @field crafting_items (Product|Ingredient)[]
-    --- @field direction "input" | "output"
-    --- @field type "'fluid'" | "'item'"
+    --- @field direction '"input"' | '"output"'
+    --- @field type '"fluid"' | '"item"'
 
     --- @param recipe LuaRecipePrototype
     --- @return TransportLineInfo[]
@@ -269,9 +294,9 @@ function AssemblerNode:generate_crafting_unit()
         -- iterate output products
         for _, product in ipairs(recipe.products) do
             if product.type == "item" then
-                item_info_list:add { type = "item", direction = "output", crafting_items = product }
+                item_info_list:add { type = "item", direction = "output", crafting_items = { product } }
             else
-                fluid_info_list:add { type = "fluid", direction = "output", crafting_items = product }
+                fluid_info_list:add { type = "fluid", direction = "output", crafting_items = { product } }
             end
         end
         item_info_list:addAll(fluid_info_list)
@@ -296,7 +321,7 @@ function AssemblerNode:generate_crafting_unit()
                 end
                 if line_info.type == "fluid" and
                         -- fluid box's connection position and transport line is at same side
-                        corresponding_fluid_box_position[2] * y > 0 and
+                        corresponding_fluid_box_position.y * y > 0 and
                         -- line next to factory can use pipe directly, so allowed
                         (fulfilled_lines[y_closer_to_factory] == nil or
                                 -- line's side towards factory will be used for underground pipe, which can't be fulfilled
@@ -335,7 +360,7 @@ function AssemblerNode:generate_crafting_unit()
                         -- pipe line further needs a pair of underground connection pipe
                         section:add({
                             name = "pipe-to-ground",
-                            position = { x = corresponding_fluid_box_position[1], y = y_closer_to_factory },
+                            position = { x = corresponding_fluid_box_position.x, y = y_closer_to_factory },
                             direction = y > 0 and defines.direction.south or defines.direction.north
                         })
                         section:add({
@@ -357,21 +382,21 @@ function AssemblerNode:generate_crafting_unit()
                             direction = belt_direction
                         })
                     end
-                    local factory_side_y = y > 0 and crafter_height or -1
+                    local connection_y = y > 0 and crafter_height or -1
                     --- @type string
                     local inserter_type
                     -- number of inserter needed to full-fill ideal crafting speed, this number is not guaranteed to be in blueprint
                     local inserter_num_need = 1
                     do
                         -- determine what kind of inserter to use for the transport line
-                        local transport_line_distance = math.abs(y - factory_side_y)
+                        local transport_line_distance = math.abs(y - connection_y)
                         -- TODO should handle transport_line_distance = 3 situation
                         transport_line_distance = (transport_line_distance <= 1) and 1 or 2
                         local inserter_order = available_inserters[transport_line_distance]
                         if inserter_order then
                             local required_rotation_per_sec = 0
                             for _, crafting_item in ipairs(line_info.crafting_items) do
-                                local avg_amount = crafting_item.amount and crafting_item.amount or ((crafting_item.amount_max + crafting_item.amount_min) / 2)
+                                local avg_amount = average_amount_of(crafting_item)
                                 required_rotation_per_sec = required_rotation_per_sec + avg_amount * ideal_crafting_speed
                             end
                             -- use lower-level inserters if it's enough
@@ -399,24 +424,19 @@ function AssemblerNode:generate_crafting_unit()
                             end
                         end
                     end
+
                     -- iterate through possible positions for placing inserter
-                    for x = 0, crafter_width - 1, 1 do
-                        if not occupied_connection_positions:any(function(occupied_pos)
-                            return occupied_pos[1] == x and occupied_pos[2] == factory_side_y
-                        end) then
-                            local inserter_position = { x, factory_side_y }
-                            local to_south = (line_info.direction == "output" and 1 or -1) * (inserter_position[2] < 0 and 1 or -1)
-                            -- make sure only 1 inserter is actually occupying a position, so that future inserts can still take over other spots
-                            if inserter_num_need == 1 then
-                                occupied_connection_positions:add(inserter_position)
-                            end
-                            section:add({
-                                name = inserter_type,
-                                position = inserter_position,
-                                direction = to_south > 0 and defines.direction.south or defines.direction.north
-                            })
+                    for coordinate, connection_spec in pairs(connection_positions) do
+                        if coordinate.y == connection_y and connection_spec.replaceable == true then
+                            connection_positions[coordinate] = {
+                                replaceable = inserter_num_need ~= 1,
+                                direction = (line_info.direction == "output" and 1 or -1) * (connection_y < 0 and 1 or -1) > 0 and defines.direction.south or defines.direction.north,
+                                entity = game.entity_prototypes[inserter_type],
+                                transport_line_y = y,
+                                line_info = line_info
+                            }
                             inserter_num_need = inserter_num_need - 1
-                            if inserter_num_need <= 0 then
+                            if inserter_num_need == 0 then
                                 break
                             end
                         end
@@ -426,7 +446,62 @@ function AssemblerNode:generate_crafting_unit()
             end
         end
     end
-    section:clear_overlap()
+    -- fill inserters and calculate corresponding item transfer speed
+    do
+        --- @type table<number, ConnectionPoint>
+        local inlet_line_spec = {}
+        --- @type table<number, ConnectionPoint>
+        local outlet_line_spec = {}
+        for coordinate, connection_spec in pairs(connection_positions) do
+            print_log("coordinate: " .. serpent.line(coordinate) .. " connection spec: " .. serpent.line(connection_spec))
+            if connection_spec.entity then
+                section:add({
+                    name = connection_spec.entity.name,
+                    direction = connection_spec.direction,
+                    position = coordinate
+                })
+                local spec_table = connection_spec.line_info.direction == "input" and inlet_line_spec or outlet_line_spec
+                -- initialize inlet/outlet table
+                do
+                    local connection_point_x = (
+                            (PlayerInfo.get_belt_direction(self.player_index) == defines.direction.east) == (connection_spec.line_info.direction == "input")
+                    ) and (crafter_width - 1) or 0
+                    if not spec_table[coordinate.y] then
+                        spec_table[coordinate.y] = {
+                            position = Coordinate(connection_point_x, connection_spec.transport_line_y),
+                            entity = connection_spec.line_info.type == "item" and preferred_belt or game.entity_prototypes["pipe"],
+                            ingredients = ArrayList.mapToTable(connection_spec.line_info.crafting_items, function(x)
+                                return x.name, 0
+                            end)
+                        }
+                    end
+                end
+
+                -- a inserter's speed is distributed according to crafting item's amount ratios
+                local crafting_item_ratios = {}
+                do
+                    local crafting_item_recipe_nums = {}
+                    local recipe_num_lookup = connection_spec.line_info.direction == "input" and self.recipe.ingredients or self.recipe.products
+                    local total_amount = 0
+                    for _, crafting_item in ipairs(recipe_num_lookup) do
+                        local average_amount = average_amount_of(crafting_item)
+                        crafting_item_recipe_nums[crafting_item.name] = average_amount
+                        total_amount = total_amount + average_amount
+                    end
+                    for item_name, amount in pairs(crafting_item_recipe_nums) do
+                        crafting_item_ratios[item_name] = amount / total_amount
+                    end
+                end
+
+                for _, crafting_item in ipairs(connection_spec.line_info.crafting_items) do
+                    spec_table[coordinate.y].ingredients[crafting_item.name] = spec_table[coordinate.y].ingredients[crafting_item.name] + PlayerInfo.inserter_items_speed(self.player_index, connection_spec.entity) * crafting_item_ratios[crafting_item.name]
+                end
+            end
+        end
+        section.inlets = ArrayList.new(inlet_line_spec)
+        section.outlets = ArrayList.new(outlet_line_spec)
+    end
+
     return section
 end
 
@@ -437,11 +512,6 @@ function AssemblerNode:generate_section()
 
     -- TODO use multiple units
     return self:generate_crafting_unit()
-end
-
---- @return LuaRecipePrototype belt prototype
-function AssemblerNode:get_preferred_belt()
-    return game.recipe_prototypes[ALL_BELTS[global.settings[self.player_index].belt]]
 end
 
 --- @class BlueprintGraph
@@ -550,7 +620,7 @@ function BlueprintGraph:__generate_assembler(recipe_name, crafting_speed, is_fin
         local new_speed
         for _, product in ipairs(node.recipe.products) do
             if product.name == recipe_name then
-                new_speed = crafting_speed / (product.amount or ((product.amount_max + product.amount_min) / 2) or 1)
+                new_speed = crafting_speed / average_amount_of(product)
                 node.recipe_speed = node.recipe_speed + new_speed
                 break
             end

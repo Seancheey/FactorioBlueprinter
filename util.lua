@@ -120,6 +120,17 @@ function ArrayList:map(f)
     return out
 end
 
+--- @param f function(ele:any):key:any, value:any
+function ArrayList:mapToTable(f)
+    assert(self and f)
+    local out = {}
+    for _, v in pairs(self) do
+        local table_key, table_val = f(v)
+        out[table_key] = table_val
+    end
+    return out
+end
+
 --- @generic T
 --- @param f function(a:T, b:T):T
 function ArrayList:reduce(f)
