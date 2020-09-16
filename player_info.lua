@@ -105,6 +105,11 @@ function PlayerInfo.get_crafting_machine_prototype(player_index, recipe)
     return get_entity_prototype(matching_prototypes[1].name)
 end
 
+--- @return LuaEntityPrototype
+function PlayerInfo.get_preferred_belt(player_index)
+    return game.entity_prototypes[ALL_BELTS[global.settings[player_index].belt]]
+end
+
 --- @return LuaTechnology[]|ArrayList
 function PlayerInfo.researched_technologies(player_index)
     local all_technologies = game.players[player_index].force.technologies
