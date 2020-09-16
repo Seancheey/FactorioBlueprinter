@@ -142,7 +142,7 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
                         local blueprint = insert_blueprint(e.player_index, blueprint_section.entities)
                         if blueprint then
                             blueprint.label = recipe.name .. " crafting unit"
-                            game.players[e.player_index].print("blueprint created. You can repeat this unit up to " .. tostring(max_repetition) .. " to reach it's full belt capacity.")
+                            game.players[e.player_index].print("blueprint created. You can repeat this unit " .. tostring(max_repetition) .. " times to reach it's full belt capacity.")
                         end
                     end
                     remove_gui(e.player_index, main_function_frame)
