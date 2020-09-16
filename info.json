@@ -1,11 +1,12 @@
 {
     "name": "Blueprinter",
-    "version": "0.3.1",
+    "version": "0.4.0",
     "title": "Blueprinter",
     "author": "Qiyi Shan",
     "contact": "adls371@outlook.com",
     "homepage": "https://github.com/Seancheey/FactorioBlueprinter",
     "factorio_version": "0.18",
     "dependencies": ["base >= 0.18"],
-    "description": "This mod gives you a new menu to produce crafting unit blueprints and massive whole factory blueprints you want."
+    "description": "This mod gives you a new menu for creating various handy crafting blueprints. you can:\n 1. create a single recipe crafting unit blueprint\n 2. (developing) create a massive whole factory blueprints by specifying inputs, outputs and production rates.\nThis mod is currently under active development, please check for updates."
+
 }
