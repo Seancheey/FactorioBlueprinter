@@ -34,7 +34,7 @@ local prototype_addition = {
                 production_type = "input"
             },
             {
-                pipe_connections = { { position = { 1, 2 }, type = "input" } },
+                pipe_connections = { { position = { 1, -2 }, type = "input" } },
                 production_type = "input"
             },
             {
@@ -96,4 +96,11 @@ function get_entity_prototype(name)
             end
         end
     })
+end
+
+--- @param crafting_item Product|Ingredient
+--- @return number average amount
+function average_amount_of(crafting_item)
+    assert(crafting_item.amount or crafting_item.amount_max, serpent.line(crafting_item) .. "has no amount or amount_max field")
+    return crafting_item.amount or ((crafting_item.amount_max + crafting_item.amount_min) / 2)
 end
