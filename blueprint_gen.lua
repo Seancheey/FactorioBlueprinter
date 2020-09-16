@@ -497,12 +497,31 @@ function AssemblerNode:generate_crafting_unit()
                     spec_table[coordinate.y].ingredients[crafting_item.name] = spec_table[coordinate.y].ingredients[crafting_item.name] + PlayerInfo.inserter_items_speed(self.player_index, connection_spec.entity) * crafting_item_ratios[crafting_item.name]
                 end
             end
+            -- TODO also add inlet/outlet for fluid
         end
         section.inlets = ArrayList.new(inlet_line_spec)
         section.outlets = ArrayList.new(outlet_line_spec)
     end
 
-    return section
+    local max_speed_unit_repetition_num = 1 / 0
+    --- @type ConnectionPoint[][]
+    local all_connections = { section.inlets, section.outlets }
+    print_log("connection points:" .. serpent.block(all_connections, {level = 3}))
+    for _, connections in ipairs(all_connections) do
+        for _, connection_point in ipairs(connections) do
+            local belt_lane_num = #ArrayList.new(connection_point.ingredients)
+            for _, speed in pairs(connection_point.ingredients) do
+                local max_belt_speed = preferred_belt.belt_speed * 480 / belt_lane_num
+                print_log("max belt speed " .. tostring(preferred_belt.belt_speed * 480))
+                local repetition = math.ceil(max_belt_speed / speed)
+                if repetition < max_speed_unit_repetition_num then
+                    max_speed_unit_repetition_num = repetition
+                end
+            end
+        end
+    end
+
+    return section, max_speed_unit_repetition_num
 end
 
 --- @return BlueprintSection
