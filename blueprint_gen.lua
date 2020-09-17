@@ -44,18 +44,20 @@ function BlueprintSection.new()
     return o
 end
 
-function BlueprintSection:copy_with_offset(xoff, yoff)
+function BlueprintSection:copy(xoff, yoff)
+    assert(self)
+    xoff = xoff or 0
+    yoff = yoff or 0
+    --- @param old Entity
     function shifted_entity(old)
-        local entity = ArrayList.shallow_copy(old)
+        local entity = deep_copy(old)
         entity.position.x = entity.position.x + xoff
         entity.position.y = entity.position.y + yoff
         return entity
     end
     local new_section = BlueprintSection.new()
     new_section.entities = toArrayList(self.entities):map(shifted_entity)
-    new_section.inlets = toArrayList(self.entities):map(shifted_entity)
-    new_section.outlets = toArrayList(self.entities):map(shifted_entity)
-
+    -- TODO also update inlets/outlets
     return new_section
 end
 
@@ -74,23 +76,18 @@ end
 --- @return BlueprintSection new self
 function BlueprintSection:concat(other, xoff, yoff)
     assertAllTruthy(self, other)
-    xoff = xoff or self.width()
+    xoff = xoff or self:width()
     yoff = yoff or 0
 
     self.outlets = {}
     for _, entity in ipairs(other.entities) do
-        local new_entity = ArrayList.shallow_copy(entity)
-        new_entity.xoff = new_entity.xoff + xoff
-        new_entity.yoff = new_entity.yoff + yoff
-        self.entities:add(new_entity)
-        for _, connection in ipairs(other.outlets) do
-            if connection.entity == entity then
-                self.outlets[#self.outlets + 1] = { entity = new_entity, ingredients = connection.ingredients }
-            end
-        end
+        local new_entity = deep_copy(entity)
+        new_entity.position.x = new_entity.position.x + xoff
+        new_entity.position.y = new_entity.position.y + yoff
+        self:add(new_entity)
+        -- TODO also add outlet transform
     end
 
-    self:organize_entity_uid()
     return self
 end
 
@@ -107,13 +104,8 @@ function BlueprintSection:width()
             max = test_max
         end
     end
-    return (max or 0) - (min or 0)
-end
-
-function BlueprintSection:organize_entity_uid()
-    for i, entity in ipairs(self.entities) do
-        entity.entity_number = i
-    end
+    local width = (max or 0) - (min or 0)
+    return width
 end
 
 --- clear overlapped units, last-in entity get saved
@@ -127,6 +119,21 @@ function BlueprintSection:clear_overlap()
     for _, entity in pairs(position_dict) do
         self:add(entity)
     end
+end
+
+--- @param n_times number
+--- @return BlueprintSection
+function BlueprintSection:repeat_self(n_times)
+    assertAllTruthy(self, n_times)
+
+    local unit = self:copy()
+    local unit_width = unit:width()
+    print_log(serpent.line(unit.entities, {maxlevel=4}))
+
+    for i = 1, n_times-1, 1 do
+        self:concat(unit, unit_width * i, 0)
+    end
+    return self
 end
 
 ALL_BELTS = { "transport-belt", "fast-transport-belt", "express-transport-belt" }
@@ -453,7 +460,7 @@ function AssemblerNode:generate_crafting_unit()
         --- @type table<number, ConnectionPoint>
         local outlet_line_spec = {}
         for coordinate, connection_spec in pairs(connection_positions) do
-            print_log("coordinate: " .. serpent.line(coordinate) .. " connection spec: " .. serpent.line(connection_spec))
+            -- print_log("coordinate: " .. serpent.line(coordinate) .. " connection spec: " .. serpent.line(connection_spec))
             if connection_spec.entity then
                 section:add({
                     name = connection_spec.entity.name,
@@ -506,7 +513,6 @@ function AssemblerNode:generate_crafting_unit()
     local max_speed_unit_repetition_num = 1 / 0
     --- @type ConnectionPoint[][]
     local all_connections = { section.inlets, section.outlets }
-    print_log("connection points:" .. serpent.block(all_connections, {level = 3}))
     for _, connections in ipairs(all_connections) do
         for _, connection_point in ipairs(connections) do
             local belt_lane_num = #ArrayList.new(connection_point.ingredients)

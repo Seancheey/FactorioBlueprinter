@@ -196,14 +196,6 @@ function ArrayList:tostring()
     return keys
 end
 
-function ArrayList:shallow_copy()
-    local out = toArrayList {}
-    for k, v in pairs(self) do
-        out[k] = v
-    end
-    return out
-end
-
 --- @generic T
 --- @param table T
 --- @return ArrayList|T
@@ -217,6 +209,24 @@ function sprite_of(name)
     elseif game.fluid_prototypes[name] then
         return "fluid/" .. name
     end
+end
+
+--- @generic T
+--- @param orig T
+--- @return T
+function deep_copy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deep_copy(orig_key)] = deep_copy(orig_value)
+        end
+        setmetatable(copy, deep_copy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
 end
 
 --- raises error if any value is nil

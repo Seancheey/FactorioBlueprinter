@@ -5,7 +5,8 @@ guilib_listening_events = {
     defines.events.on_gui_opened,
     defines.events.on_gui_elem_changed,
     defines.events.on_gui_selection_state_changed,
-    defines.events.on_gui_text_changed
+    defines.events.on_gui_text_changed,
+    defines.events.on_gui_value_changed,
 }
 
 -- gui_handlers[player_index][event][gui_path] = handler
