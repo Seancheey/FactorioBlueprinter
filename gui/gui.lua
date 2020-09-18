@@ -11,10 +11,13 @@ output_units = { "item/s", "item/min" }
 
 --- clear gui and its children as well as unregister all it's handlers.
 --- Non-existing gui element is tolerated and nothing will be done in this case.
---- @param gui_name string must be one of element in gui root
-function remove_gui(player_index, gui_name)
-    assertAllTruthy(player_index, gui_name)
-    local gui = gui_root(player_index)[gui_name]
+--- @param gui LuaGuiElement|string an element's name in gui root or an gui element
+function remove_gui(player_index, gui)
+    assert(player_index)
+
+    if type(gui) == "string" then
+        gui = gui_root(player_index)[gui]
+    end
 
     if gui then
         unregister_all_handlers(player_index, gui)

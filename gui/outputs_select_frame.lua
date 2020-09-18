@@ -105,102 +105,139 @@ local function create_outputs_select_tab(player_index, tab_pane)
     tab_pane.add_tab(output_tab, output_flow)
 end
 
+CraftingUnitSelectTab = {}
+
+--- @param recipe_max_repetition number
+--- @param gui_parent LuaGuiElement
+--- @return LuaGuiElement repeat number selector
+function CraftingUnitSelectTab.create_repeat_num_selector(player_index, gui_parent, repetition_num_pointer, recipe_max_repetition)
+    assertAllTruthy(player_index, gui_parent, repetition_num_pointer, recipe_max_repetition)
+
+    local repeat_num_frame = gui_parent.add { name = "repeat_num_frame", type = "frame", direction = "horizontal", caption = "Repeat unit" }
+    repeat_num_frame.add { name = "repeat_num_label", type = "label", caption = "repeat unit" }
+    local repeat_num_field = repeat_num_frame.add { name = "repeat_num_field", type = "textfield", numeric = true, allow_decimal = false }
+    repeat_num_frame.add { name = "repeat_times_label", type = "label", caption = "times" }
+    repeat_num_field.style.maximal_width = 30
+    repeat_num_field.text = tostring(Pointer.get(repetition_num_pointer))
+    local repeat_num_slider = repeat_num_frame.add { name = "repeat_num_slider", type = "slider", minimum_value = 1, maximum_value = 10, value = 1, value_step = 1, discrete_slider = true, discrete_values = true }
+    repeat_num_slider.style.maximal_width = 80
+    repeat_num_slider.set_slider_minimum_maximum(1, recipe_max_repetition)
+    repeat_num_frame.add { name = "max_repetition_lavel", type = "label", caption = "(capacity: " .. tostring(recipe_max_repetition) .. ")" }
+    register_gui_event_handler(player_index, repeat_num_field, defines.events.on_gui_text_changed, function(e)
+        local new_repeat = tonumber(e.element.text)
+        if new_repeat then
+            new_repeat = new_repeat > recipe_max_repetition and recipe_max_repetition or new_repeat
+            if new_repeat ~= Pointer.get(repetition_num_pointer) then
+                Pointer.set(repetition_num_pointer, new_repeat)
+                repeat_num_slider.slider_value = new_repeat
+            end
+            if new_repeat ~= tonumber(e.element.text) then
+                repeat_num_field.text = tostring(new_repeat)
+            end
+        end
+    end)
+    register_gui_event_handler(player_index, repeat_num_slider, defines.events.on_gui_value_changed, function(e)
+        local new_repeat = math.ceil(e.element.slider_value)
+        if new_repeat ~= Pointer.get(repetition_num_pointer) then
+            Pointer.set(repetition_num_pointer, new_repeat)
+            repeat_num_field.text = tostring(new_repeat)
+        end
+    end)
+    return repeat_num_frame
+end
+
+--- @param gui_parent LuaGuiElement
+--- @param blueprint_pointer Pointer|BlueprintSection[]
+function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, recipe, repetition_pointer)
+    assertAllTruthy(player_index, gui_parent, recipe, repetition_pointer)
+
+    local confirm_button = gui_parent.add { name = "confirm_button", type = "button", caption = "Confirm" }
+    register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click, function(e)
+        local blueprint_section = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit():repeat_self(Pointer.get(repetition_pointer))
+        local blueprint = insert_blueprint(e.player_index, blueprint_section.entities)
+        if blueprint then
+            blueprint.label = recipe.name .. " crafting unit"
+            game.players[e.player_index].print("blueprint \"" .. blueprint.label .. "\" created.")
+        end
+        remove_gui(e.player_index, main_function_frame)
+    end)
+    return confirm_button
+end
+
+--- @class BlueprintDirectionSpec
+--- @field ingredientDirection defines.direction
+--- @field productPosition defines.direction
+--- @field productDirection defines.direction
+
+--- @param gui_parent LuaGuiElement
+--- @return LuaGuiElement
+function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_parent)
+    assertAllTruthy(player_index, gui_parent)
+
+    local direction_frame = gui_parent.add { name = "direction_select_frame", type = "frame", direction = "vertical", caption = "Ingredients and Products flow direction" }
+    do
+        direction_frame.add { name = "belt_direction_label", type = "label", caption = "Select crafting unit's belt direction:" }
+        local belt_direction_table = direction_frame.add { name = "belt_direction_table", type = "table", column_count = 4 }
+        local belt_direction_preference = PlayerInfo.get_belt_direction(player_index)
+        belt_direction_table.add { name = "left_label", type = "label", caption = "left" }
+        local left_button = belt_direction_table.add { name = "left_button", type = "radiobutton", state = belt_direction_preference == defines.direction.west }
+
+        belt_direction_table.add { name = "right_label", type = "label", caption = "right" }
+        local right_button = belt_direction_table.add { name = "right_button", type = "radiobutton", state = belt_direction_preference == defines.direction.east }
+
+        register_gui_event_handler(player_index, left_button, defines.events.on_gui_click, function(e)
+            left_button.state = true
+            right_button.state = false
+            PlayerInfo.set_belt_direction(e.player_index, defines.direction.west)
+        end)
+
+        register_gui_event_handler(player_index, right_button, defines.events.on_gui_click, function(e)
+            left_button.state = false
+            right_button.state = true
+            PlayerInfo.set_belt_direction(e.player_index, defines.direction.east)
+        end)
+    end
+    return direction_frame
+end
+
+function CraftingUnitSelectTab.remove_all()
+
+end
+
 --- @param tab_pane LuaGuiElement
 local function create_crafting_unit_select_tab(player_index, tab_pane)
     --- @type BlueprintSection[]
-    local blueprint_pointer = {}
-    local recipe_name = ""
-    local max_repetition_num = 1
-    local repetition_num = 1
 
     local crafting_unit_tab = tab_pane.add { type = "tab", name = "crafting_unit_tab", caption = "crafting unit" }
     local crafting_unit_flow = tab_pane.add { type = "flow", name = "crafting_unit_flow", direction = "vertical" }
     do
-        crafting_unit_flow.add { name = "belt_direction_label", type = "label", caption = "Select crafting unit's belt direction:" }
-        local belt_direction_table = crafting_unit_flow.add { name = "belt_direction_table", type = "table", column_count = 4 }
-        do
-            local belt_direction_preference = PlayerInfo.get_belt_direction(player_index)
-            belt_direction_table.add { name = "left_label", type = "label", caption = "left" }
-            local left_button = belt_direction_table.add { name = "left_button", type = "radiobutton", state = belt_direction_preference == defines.direction.west }
-
-            belt_direction_table.add { name = "right_label", type = "label", caption = "right" }
-            local right_button = belt_direction_table.add { name = "right_button", type = "radiobutton", state = belt_direction_preference == defines.direction.east }
-
-            register_gui_event_handler(player_index, left_button, defines.events.on_gui_click, function(e)
-                left_button.state = true
-                right_button.state = false
-                PlayerInfo.set_belt_direction(e.player_index, defines.direction.west)
-            end)
-
-            register_gui_event_handler(player_index, right_button, defines.events.on_gui_click, function(e)
-                left_button.state = false
-                right_button.state = true
-                PlayerInfo.set_belt_direction(e.player_index, defines.direction.east)
-            end)
-        end
         crafting_unit_flow.add { name = "recipe_select_label", type = "label", caption = "Select your new crafting unit's recipe:" }
         local choose_button = crafting_unit_flow.add { name = "recipe_choose_button", type = "choose-elem-button", elem_type = "recipe", elem_filters = {
             enabled = true
         } }
-        local repeat_num_flow = crafting_unit_flow.add { name = "repeat_num_flow", type = "flow", direction = "horizontal" }
-        local repeat_num_label = repeat_num_flow.add { name = "repeat_num_label", type = "label", caption = "repeat unit" }
-        local repeat_num_field = repeat_num_flow.add { name = "repeat_num_field", type = "textfield", numeric = true, allow_decimal = false }
-        local repeat_times_label = repeat_num_flow.add { name = "repeat_times_label", type = "label", caption = "times" }
-        repeat_num_field.style.maximal_width = 30
-        local repeat_num_slider = repeat_num_flow.add { name = "repeat_num_slider", type = "slider", minimum_value = 1, maximum_value = 10, value = 1, value_step = 1, discrete_slider = true, discrete_values = true }
-        repeat_num_slider.style.maximal_width = 80
-        repeat_num_flow.visible = false
-        register_gui_event_handler(player_index, repeat_num_field, defines.events.on_gui_text_changed, function(e)
-            local new_repeat = tonumber(e.element.text)
-            if new_repeat then
-                if new_repeat > max_repetition_num then
-                    new_repeat = max_repetition_num
-                end
-                if new_repeat ~= repetition_num then
-                    repetition_num = new_repeat
-                    repeat_num_slider.slider_value = new_repeat
-                end
-            end
-        end)
-        register_gui_event_handler(player_index, repeat_num_slider, defines.events.on_gui_value_changed, function(e)
-            local new_repeat = math.ceil(e.element.slider_value)
-            if new_repeat ~= repetition_num then
-                repetition_num = new_repeat
-                repeat_num_field.text = tostring(new_repeat)
-            end
-        end)
-        local confirm_button = crafting_unit_flow.add { name = "confirm_button", type = "button", caption = "Confirm" }
-        confirm_button.visible = false
-        register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click, function(e)
-            print_log("repeat : ".. tostring(repetition_num))
-            local blueprint = insert_blueprint(e.player_index, blueprint_pointer[1]:repeat_self(repetition_num).entities)
-            if blueprint then
-                blueprint.label = recipe_name .. " crafting unit"
-                game.players[e.player_index].print("blueprint \"" .. blueprint.label .. "\" created. You can repeat this unit " .. tostring(repetition_num) .. " times to reach it's full belt capacity.")
-            end
-            remove_gui(e.player_index, main_function_frame)
-        end)
+
+        local direction_frame, repeat_num_selector, confirm_button
         register_gui_event_handler(player_index, choose_button, defines.events.on_gui_elem_changed, function(e)
+            remove_gui(player_index, direction_frame)
+            direction_frame = nil
+            remove_gui(player_index, repeat_num_selector)
+            repeat_num_selector = nil
+            remove_gui(player_index, confirm_button)
+            confirm_button = nil
             if e.element.elem_value then
                 local recipe = game.recipe_prototypes[e.element.elem_value]
-                blueprint_pointer[1], max_repetition_num = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit()
-                if blueprint_pointer[1] then
-                    repetition_num = 1
-                    recipe_name = recipe.name
-                    confirm_button.visible = true
+                local blueprint, max_repetition_num = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit()
+                if blueprint and max_repetition_num then
+                    direction_frame = CraftingUnitSelectTab.create_direction_select_frame(player_index, crafting_unit_flow)
+                    local repetition_pointer = Pointer.new(1)
                     if max_repetition_num > 1 then
-                        repeat_num_flow.visible = true
-                        repeat_num_field.text = "1"
-                        repeat_num_slider.set_slider_minimum_maximum(1, max_repetition_num)
-                    else
-                        repeat_num_flow.visible = false
+                        repeat_num_selector = CraftingUnitSelectTab.create_repeat_num_selector(player_index, crafting_unit_flow, repetition_pointer, max_repetition_num)
                     end
+                    confirm_button = CraftingUnitSelectTab.create_confirm_button(player_index, crafting_unit_flow, recipe, repetition_pointer)
                 end
-            else
-                repeat_num_flow.visible = false
-                confirm_button.visible = false
             end
         end)
+
     end
     tab_pane.add_tab(crafting_unit_tab, crafting_unit_flow)
 end

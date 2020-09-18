@@ -18,6 +18,27 @@ function print_log(msg, level)
     end
 end
 
+--- @class Pointer a simple reference pointer
+Pointer = {}
+
+--- @generic T
+--- @param val T
+--- @return T[]
+function Pointer.new(val)
+    return { val }
+end
+
+--- @generic T
+--- @param ref T[]
+--- @return T
+function Pointer.get(ref)
+    return ref[1]
+end
+
+function Pointer.set(ref, value)
+    ref[1] = value
+end
+
 --- @class ArrayList
 ArrayList = {}
 ArrayList.__index = ArrayList
@@ -86,7 +107,7 @@ function ArrayList:insert(val, pos)
     self[p] = val
 end
 
---- @param comp function(a, b):boolean element goes into the first element with true value returned
+--- @param comp fun(a, b):boolean element goes into the first element with true value returned
 function ArrayList:insert_by_order(val, comp)
     assertAllTruthy(self, val, comp)
     for i, list_val in ipairs(self) do
@@ -100,7 +121,7 @@ end
 
 --- @generic T
 --- @param val T
---- @param eq_func function(a:T, b:T):boolean
+--- @param eq_func fun(a:T, b:T):boolean
 --- @return boolean
 function ArrayList:has(val, eq_func)
     assert(self and val)
@@ -112,7 +133,7 @@ function ArrayList:has(val, eq_func)
     return false
 end
 
---- @param f function(ele: any):any
+--- @param f fun(ele: any):any
 --- @return ArrayList
 function ArrayList:map(f)
     assert(self and f)
@@ -123,7 +144,7 @@ function ArrayList:map(f)
     return out
 end
 
---- @param f function(ele:any):key:any, value:any
+--- @param f fun(ele:any):any, any
 function ArrayList:mapToTable(f)
     assert(self and f)
     local out = {}
@@ -135,7 +156,7 @@ function ArrayList:mapToTable(f)
 end
 
 --- @generic T
---- @param f function(a:T, b:T):T
+--- @param f fun(a:T, b:T):T
 function ArrayList:reduce(f)
     assert(self and f)
     local val = self[1]
@@ -145,7 +166,7 @@ function ArrayList:reduce(f)
     return val
 end
 
---- @param f function(ele: any):boolean
+--- @param f fun(ele: any):boolean
 --- @return ArrayList
 function ArrayList:filter(f)
     assert(self and f)
@@ -160,7 +181,7 @@ function ArrayList:filter(f)
     return out
 end
 
---- @param f function(ele: any):boolean
+--- @param f fun(ele: any):boolean
 --- @return boolean
 function ArrayList:all(f)
     assert(self and f)
@@ -175,7 +196,7 @@ function ArrayList:all(f)
     return true
 end
 
---- @param f function(ele: any):boolean
+--- @param f fun(ele: any):boolean
 --- @return boolean
 function ArrayList:any(f)
     f = f or function(x)
@@ -217,7 +238,7 @@ end
 --- @generic T
 --- @param orig T
 --- @return T
-function deep_copy(orig)
+function deep_copy(orig, keep_metatable)
     local orig_type = type(orig)
     local copy
     if orig_type == 'table' then
@@ -225,8 +246,28 @@ function deep_copy(orig)
         for orig_key, orig_value in next, orig, nil do
             copy[deep_copy(orig_key)] = deep_copy(orig_value)
         end
-        setmetatable(copy, deep_copy(getmetatable(orig)))
-    else -- number, string, boolean, etc
+        if keep_metatable then
+            setmetatable(copy, deep_copy(getmetatable(orig)))
+        end
+    else
+        -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end
+
+--- @generic T
+--- @param orig T
+--- @return T
+function shallow_copy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in pairs(orig) do
+            copy[orig_key] = orig_value
+        end
+    else
         copy = orig
     end
     return copy
