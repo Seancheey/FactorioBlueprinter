@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.6.0
+Date: 2020.09.18
+  Feature:
+    - UI improvement for choosing crafting unit
+  Bugfixes:
+    - Fix bug that makes choosing blueprint whole factory raise error
+    - Fix bug that makes double transport belt blueprint break
+    - Fix bug that makes belt direction option not working after choosing recipe
+
+---------------------------------------------------------------------------------------------------
 Version: 0.5.0
 Date: 2020.09.17
   Feature:
