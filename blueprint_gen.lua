@@ -590,7 +590,7 @@ function BlueprintGraph:use_products_as_input(item_name)
     end
 
     -- remove unnecessary input sources that are fully covered by other sources
-    local others = self.inputs:shallow_copy()
+    local others = shallow_copy(self.inputs)
     local to_remove = {}
     for input_name, input_node in pairs(self.inputs) do
         others[input_name] = nil

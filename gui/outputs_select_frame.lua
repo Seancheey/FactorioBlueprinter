@@ -142,14 +142,14 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
         local choose_button = crafting_unit_flow.add { name = "recipe_choose_button", type = "choose-elem-button", elem_type = "recipe", elem_filters = {
             enabled = true
         } }
-        local repeat_num_flow = crafting_unit_flow.add { name = "repeat_num_flow", type = "flow", direction = "horizontal" }
-        local repeat_num_label = repeat_num_flow.add { name = "repeat_num_label", type = "label", caption = "repeat unit" }
-        local repeat_num_field = repeat_num_flow.add { name = "repeat_num_field", type = "textfield", numeric = true, allow_decimal = false }
-        local repeat_times_label = repeat_num_flow.add { name = "repeat_times_label", type = "label", caption = "times" }
+        local repeat_num_frame = crafting_unit_flow.add { name = "repeat_num_frame", type = "frame", direction = "horizontal", caption = "Repeat unit" }
+        repeat_num_frame.add { name = "repeat_num_label", type = "label", caption = "repeat unit" }
+        local repeat_num_field = repeat_num_frame.add { name = "repeat_num_field", type = "textfield", numeric = true, allow_decimal = false }
+        repeat_num_frame.add { name = "repeat_times_label", type = "label", caption = "times" }
         repeat_num_field.style.maximal_width = 30
-        local repeat_num_slider = repeat_num_flow.add { name = "repeat_num_slider", type = "slider", minimum_value = 1, maximum_value = 10, value = 1, value_step = 1, discrete_slider = true, discrete_values = true }
+        local repeat_num_slider = repeat_num_frame.add { name = "repeat_num_slider", type = "slider", minimum_value = 1, maximum_value = 10, value = 1, value_step = 1, discrete_slider = true, discrete_values = true }
         repeat_num_slider.style.maximal_width = 80
-        repeat_num_flow.visible = false
+        repeat_num_frame.visible = false
         register_gui_event_handler(player_index, repeat_num_field, defines.events.on_gui_text_changed, function(e)
             local new_repeat = tonumber(e.element.text)
             if new_repeat then
@@ -172,7 +172,7 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
         local confirm_button = crafting_unit_flow.add { name = "confirm_button", type = "button", caption = "Confirm" }
         confirm_button.visible = false
         register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click, function(e)
-            print_log("repeat : ".. tostring(repetition_num))
+            print_log("repeat : " .. tostring(repetition_num))
             local blueprint = insert_blueprint(e.player_index, blueprint_pointer[1]:repeat_self(repetition_num).entities)
             if blueprint then
                 blueprint.label = recipe_name .. " crafting unit"
@@ -189,15 +189,15 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
                     recipe_name = recipe.name
                     confirm_button.visible = true
                     if max_repetition_num > 1 then
-                        repeat_num_flow.visible = true
+                        repeat_num_frame.visible = true
                         repeat_num_field.text = "1"
                         repeat_num_slider.set_slider_minimum_maximum(1, max_repetition_num)
                     else
-                        repeat_num_flow.visible = false
+                        repeat_num_frame.visible = false
                     end
                 end
             else
-                repeat_num_flow.visible = false
+                repeat_num_frame.visible = false
                 confirm_button.visible = false
             end
         end)

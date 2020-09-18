@@ -214,7 +214,7 @@ end
 --- @generic T
 --- @param orig T
 --- @return T
-function deep_copy(orig)
+function deep_copy(orig, keep_metatable)
     local orig_type = type(orig)
     local copy
     if orig_type == 'table' then
@@ -222,8 +222,28 @@ function deep_copy(orig)
         for orig_key, orig_value in next, orig, nil do
             copy[deep_copy(orig_key)] = deep_copy(orig_value)
         end
-        setmetatable(copy, deep_copy(getmetatable(orig)))
-    else -- number, string, boolean, etc
+        if keep_metatable then
+            setmetatable(copy, deep_copy(getmetatable(orig)))
+        end
+    else
+        -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end
+
+--- @generic T
+--- @param orig T
+--- @return T
+function shallow_copy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in pairs(orig) do
+            copy[orig_key] = orig_value
+        end
+    else
         copy = orig
     end
     return copy
