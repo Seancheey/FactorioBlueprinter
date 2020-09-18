@@ -128,9 +128,9 @@ function BlueprintSection:repeat_self(n_times)
 
     local unit = self:copy()
     local unit_width = unit:width()
-    print_log(serpent.line(unit.entities, {maxlevel=4}))
+    print_log(serpent.line(unit.entities, { maxlevel = 4 }))
 
-    for i = 1, n_times-1, 1 do
+    for i = 1, n_times - 1, 1 do
         self:concat(unit, unit_width * i, 0)
     end
     return self
@@ -467,30 +467,28 @@ function AssemblerNode:generate_crafting_unit()
                     direction = connection_spec.direction,
                     position = coordinate
                 })
-                local spec_table = connection_spec.line_info.direction == "input" and inlet_line_spec or outlet_line_spec
-                -- initialize inlet/outlet table
-                do
+                local spec_table = (connection_spec.line_info.direction == "input") and inlet_line_spec or outlet_line_spec
+                -- initialize inlet/outlet table if entry not exists
+                if not spec_table[connection_spec.transport_line_y] then
                     local connection_point_x = (
                             (PlayerInfo.get_belt_direction(self.player_index) == defines.direction.east) == (connection_spec.line_info.direction == "input")
                     ) and (crafter_width - 1) or 0
-                    if not spec_table[coordinate.y] then
-                        spec_table[coordinate.y] = {
-                            position = Coordinate(connection_point_x, connection_spec.transport_line_y),
-                            entity = connection_spec.line_info.type == "item" and preferred_belt or game.entity_prototypes["pipe"],
-                            ingredients = ArrayList.mapToTable(connection_spec.line_info.crafting_items, function(x)
-                                return x.name, 0
-                            end)
-                        }
-                    end
+                    spec_table[connection_spec.transport_line_y] = {
+                        position = Coordinate(connection_point_x, connection_spec.transport_line_y),
+                        entity = connection_spec.line_info.type == "item" and preferred_belt or game.entity_prototypes["pipe"],
+                        ingredients = ArrayList.mapToTable(connection_spec.line_info.crafting_items, function(x)
+                            return x.name, 0
+                        end)
+                    }
                 end
 
-                -- a inserter's speed is distributed according to crafting item's amount ratios
+                --- a inserter's speed is split by two items in the belt according to it's recipe items' amount ratios
+                --- @type table<string, number> item name to it's speed
                 local crafting_item_ratios = {}
                 do
                     local crafting_item_recipe_nums = {}
-                    local recipe_num_lookup = connection_spec.line_info.direction == "input" and self.recipe.ingredients or self.recipe.products
                     local total_amount = 0
-                    for _, crafting_item in ipairs(recipe_num_lookup) do
+                    for _, crafting_item in ipairs(connection_spec.line_info.crafting_items) do
                         local average_amount = average_amount_of(crafting_item)
                         crafting_item_recipe_nums[crafting_item.name] = average_amount
                         total_amount = total_amount + average_amount
@@ -498,10 +496,11 @@ function AssemblerNode:generate_crafting_unit()
                     for item_name, amount in pairs(crafting_item_recipe_nums) do
                         crafting_item_ratios[item_name] = amount / total_amount
                     end
+                    print_log("crafting_item_ratios = " .. serpent.line(crafting_item_ratios))
                 end
 
                 for _, crafting_item in ipairs(connection_spec.line_info.crafting_items) do
-                    spec_table[coordinate.y].ingredients[crafting_item.name] = spec_table[coordinate.y].ingredients[crafting_item.name] + PlayerInfo.inserter_items_speed(self.player_index, connection_spec.entity) * crafting_item_ratios[crafting_item.name]
+                    spec_table[connection_spec.transport_line_y].ingredients[crafting_item.name] = spec_table[connection_spec.transport_line_y].ingredients[crafting_item.name] + PlayerInfo.inserter_items_speed(self.player_index, connection_spec.entity) * crafting_item_ratios[crafting_item.name]
                 end
             end
             -- TODO also add inlet/outlet for fluid
