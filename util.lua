@@ -225,10 +225,15 @@ function toArrayList(table)
 end
 
 function sprite_of(name)
+    assert(type(name) == "string")
     if game.item_prototypes[name] then
         return "item/" .. name
     elseif game.fluid_prototypes[name] then
         return "fluid/" .. name
+    elseif game.entity_prototypes[name] then
+        return "entity/" .. name
+    else
+        print_log("failed to find sprite path for name " .. name)
     end
 end
 

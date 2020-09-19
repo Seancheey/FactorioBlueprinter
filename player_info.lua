@@ -1,6 +1,11 @@
 PlayerInfo = {}
 PlayerInfo.__index = PlayerInfo
 
+--- @class BlueprintDirectionSpec
+--- @field ingredientDirection defines.direction
+--- @field productPosition defines.direction
+--- @field productDirection defines.direction
+
 --- @return LuaEntityPrototype[]
 function PlayerInfo.unlocked_crafting_machines(player_index)
     local all_factory_list = toArrayList()
