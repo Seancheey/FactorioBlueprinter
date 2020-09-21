@@ -1,10 +1,15 @@
 PlayerInfo = {}
 PlayerInfo.__index = PlayerInfo
 
+--- @class PlayerSetting
+--- @field factory_priority LuaEntityPrototype[] factory prototype
+--- @field belt number
+--- @field direction_spec BlueprintDirectionSpec
+
 --- @class BlueprintDirectionSpec
---- @field ingredientDirection defines.direction
---- @field productPosition defines.direction
---- @field productDirection defines.direction
+--- @field ingredientDirection defines.direction player UI visible transformation
+--- @field productPosition defines.direction player UI visible transformation
+--- @field productDirection defines.direction player UI visible transformation
 
 --- @return LuaEntityPrototype[]
 function PlayerInfo.unlocked_crafting_machines(player_index)
@@ -143,19 +148,36 @@ function PlayerInfo.inserter_items_speed(player_index, inserter_prototype)
     return (inserter_prototype.inserter_rotation_speed * 60) * PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
 end
 
---- @return defines.direction
-function PlayerInfo.get_belt_direction(player_index)
-    return global.settings[player_index].belt_direction or defines.direction.east
+--- @class InternalDirectionSpec
+--- @field linearIngredientDirection defines.direction internal specification
+--- @field linearOutputDirection defines.direction internal specification
+--- @field blueprintRotation number num of 90 degrees to rotate
+
+--- @param original_output_position defines.direction
+--- @return InternalDirectionSpec
+function PlayerInfo.get_internal_direction_spec(player_index, original_output_position)
+    assertAllTruthy(player_index, original_output_position)
+
+    local ui_spec = PlayerInfo.direction_settings(player_index)
+    --- @type InternalDirectionSpec
+    local internal_spec = {}
+
+    internal_spec.blueprintRotation = ((ui_spec.productPosition - original_output_position) % 8) / 2
+    internal_spec.linearIngredientDirection = (ui_spec.ingredientDirection - (internal_spec.blueprintRotation * 2)) % 8
+    internal_spec.linearOutputDirection = (ui_spec.productDirection - (internal_spec.blueprintRotation * 2)) % 8
+
+    return internal_spec
 end
 
-function PlayerInfo.set_belt_direction(player_index, direction)
-    global.settings[player_index].belt_direction = direction
+--- @return BlueprintDirectionSpec a modifiable direction specification
+function PlayerInfo.direction_settings(player_index)
+    return global.settings[player_index].direction_spec
 end
 
 function PlayerInfo.set_default_settings(player_index)
     global.settings[player_index] = {
         belt = 1,
         factory_priority = {},
-        belt_direction = defines.direction.east
+        direction_spec = { ingredientDirection = defines.direction.east, productDirection = defines.direction.east, productPosition = defines.direction.north }
     }
 end

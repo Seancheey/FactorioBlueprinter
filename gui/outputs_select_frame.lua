@@ -185,22 +185,46 @@ function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_p
             --- @type table<defines.direction, LuaGuiElement>
             local direction_buttons = {}
 
-            local function update_direction_preference(direction)
-                if direction % 2 == 0 then
-                    local shift = (direction % 4 == 0) and 1 or -1
-                    local multiplier = -1
-                    for i = 1, 7, 2 do
-                        direction_buttons[i].sprite = direction_sprite((i + shift * multiplier) % 8)
-                        if preview_sprites[i].sprite ~= "" then
-                            preview_sprites[i].sprite = direction_buttons[i].sprite
+            --- update the direction preference for the player
+            --- @param pressed_button_pos defines.direction position of the button that's pressed
+            local function update_direction_preference(pressed_button_pos)
+                local direction_spec = PlayerInfo.direction_settings(player_index)
+                if pressed_button_pos % 2 == 0 then
+                    direction_spec.ingredientDirection = Vector.fromDirection(pressed_button_pos):reverse():toDirection()
+                    -- if pressed button is input direction button, update the position and direction of outputs
+                    local direction_shift = (pressed_button_pos % 4 == 0) and -1 or 1
+                    for output_button_pos = 1, 7, 2 do
+                        local new_output_direction = (output_button_pos + direction_shift) % 8
+                        direction_buttons[output_button_pos].sprite = direction_sprite(new_output_direction)
+                        if preview_sprites[output_button_pos].sprite ~= "" then
+                            preview_sprites[output_button_pos].sprite = direction_buttons[output_button_pos].sprite
+                            direction_spec.productDirection = new_output_direction
+                            direction_spec.productPosition = (new_output_direction - 2 * direction_shift) % 8
                         end
-                        multiplier = multiplier * -1
+                        direction_shift = direction_shift * -1
                     end
+                else
+                    local input_button_pos
+                    for i = 0, 6, 2 do
+                        if preview_sprites[i].sprite ~= "" then
+                            input_button_pos = i
+                            break
+                        end
+                    end
+                    local input_direction_vector = Vector.fromDirection(input_button_pos):reverse()
+                    local output_button_pos_vector = Vector.fromDirection(pressed_button_pos)
+                    direction_spec.productDirection = Vector.new(
+                            input_direction_vector.x == 0 and 0 or output_button_pos_vector.x,
+                            input_direction_vector.y == 0 and 0 or output_button_pos_vector.y
+                    )                                      :toDirection()
+                    direction_spec.productPosition = Vector.new(
+                            input_direction_vector.x == 0 and output_button_pos_vector.x or 0,
+                            input_direction_vector.y == 0 and output_button_pos_vector.y or 0
+                    )                                       :toDirection()
                 end
-                preview_sprites[direction].sprite = direction_buttons[direction].sprite
-                for i = 2, 6, 2 do
-                    local other_gui = preview_sprites[(direction + i) % 8]
-                    other_gui.sprite = nil
+                preview_sprites[pressed_button_pos].sprite = direction_buttons[pressed_button_pos].sprite
+                for other_same_type_button_offset = 2, 6, 2 do
+                    preview_sprites[(pressed_button_pos + other_same_type_button_offset) % 8].sprite = nil
                 end
             end
 

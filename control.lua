@@ -15,11 +15,6 @@ function init_all_global()
     global.settings = global.settings or {}
 end
 
---- @class PlayerSetting
---- @field factory_priority LuaEntityPrototype[] factory prototype
---- @field belt number
---- @field belt_direction defines.direction a direction
---- @return PlayerSetting
 
 function init_player_mod(player_index)
     if not global.settings[player_index] then
