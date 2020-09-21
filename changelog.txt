@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.7.0
+Date: 2020.09.20
+  Feature:
+    - Add support to choose blueprint input direction and output direction
+  Bugfixes:
+    - Fix bug that makes full fluid crafting recipe crashes game
+
+---------------------------------------------------------------------------------------------------
 Version: 0.6.0
 Date: 2020.09.18
   Feature:
