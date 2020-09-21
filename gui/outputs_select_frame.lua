@@ -121,7 +121,7 @@ function CraftingUnitSelectTab.create_repeat_num_selector(player_index, gui_pare
     repeat_num_field.text = tostring(Pointer.get(repetition_num_pointer))
     local repeat_num_slider = repeat_num_frame.add { name = "repeat_num_slider", type = "slider", minimum_value = 1, maximum_value = 10, value = 1, value_step = 1, discrete_slider = true, discrete_values = true }
     repeat_num_slider.style.maximal_width = 80
-    repeat_num_slider.set_slider_minimum_maximum(1, recipe_max_repetition)
+    repeat_num_slider.set_slider_minimum_maximum(1, (recipe_max_repetition > 100) and 100 or recipe_max_repetition)
     repeat_num_frame.add { name = "max_repetition_lavel", type = "label", caption = "(capacity: " .. tostring(recipe_max_repetition) .. ")" }
     register_gui_event_handler(player_index, repeat_num_field, defines.events.on_gui_text_changed, function(e)
         local new_repeat = tonumber(e.element.text)
@@ -153,7 +153,9 @@ function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, r
 
     local confirm_button = gui_parent.add { name = "confirm_button", type = "button", caption = "Confirm" }
     register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click, function(e)
-        local blueprint_section = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit():repeat_self(Pointer.get(repetition_pointer))
+        local new_unit, _, direction_spec = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit()
+        local blueprint_section = new_unit:repeat_self(Pointer.get(repetition_pointer))
+        blueprint_section:rotate(direction_spec.blueprintRotation)
         local blueprint = insert_blueprint(e.player_index, blueprint_section.entities)
         if blueprint then
             blueprint.label = recipe.name .. " crafting unit"
@@ -216,11 +218,11 @@ function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_p
                     direction_spec.productDirection = Vector.new(
                             input_direction_vector.x == 0 and 0 or output_button_pos_vector.x,
                             input_direction_vector.y == 0 and 0 or output_button_pos_vector.y
-                    )                                      :toDirection()
+                    )                                       :toDirection()
                     direction_spec.productPosition = Vector.new(
                             input_direction_vector.x == 0 and output_button_pos_vector.x or 0,
                             input_direction_vector.y == 0 and output_button_pos_vector.y or 0
-                    )                                       :toDirection()
+                    )                                      :toDirection()
                 end
                 preview_sprites[pressed_button_pos].sprite = direction_buttons[pressed_button_pos].sprite
                 for other_same_type_button_offset = 2, 6, 2 do
