@@ -351,7 +351,7 @@ function AssemblerNode:generate_crafting_unit()
                 local corresponding_fluid_box_position = fluid_box_positions[line_info.direction][fluid_box_indices[line_info.direction]]
                 -- pre-check for any crafting machine prototypes with unknown fluid box support
                 if line_info.type == "fluid" and corresponding_fluid_box_position == nil then
-                    print_log("This mod recipe needs fluid box connection, which is not supported by the mod yet. Failed to make blueprint :(", logging.E)
+                    print_log("This mod recipe's crafting machine needs fluid box connection, which is not supported by the mod yet. Consider prioritize a built-in crafting machine instead? Failed to make blueprint :(", logging.E)
                     print_log("You can add support for this recipe by contributing it's fluid box connections in github: https://github.com/Seancheey/FactorioBlueprinter/blob/master/prototype_info.lua")
                     return
                 end
