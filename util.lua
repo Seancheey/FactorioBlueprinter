@@ -228,11 +228,95 @@ function toArrayList(table)
 end
 
 function sprite_of(name)
+    assert(type(name) == "string")
     if game.item_prototypes[name] then
         return "item/" .. name
     elseif game.fluid_prototypes[name] then
         return "fluid/" .. name
+    elseif game.entity_prototypes[name] then
+        return "entity/" .. name
+    else
+        print_log("failed to find sprite path for name " .. name)
     end
+end
+
+--- @class Vector
+--- @field x number
+--- @field y number
+
+--- @type Vector
+Vector = {}
+Vector.__index = Vector
+
+--- @return Vector
+function Vector.new(x, y)
+    return setmetatable({ x = x or 0, y = y or 0 }, Vector)
+end
+
+--- @param direction defines.direction
+--- @return Vector
+function Vector.fromDirection(direction)
+    assertAllTruthy(direction)
+
+    if direction == 0 then
+        return Vector.new(0, -1)
+    elseif direction == 1 then
+        return Vector.new(1, -1)
+    elseif direction == 2 then
+        return Vector.new(1, 0)
+    elseif direction == 3 then
+        return Vector.new(1, 1)
+    elseif direction == 4 then
+        return Vector.new(0, 1)
+    elseif direction == 5 then
+        return Vector.new(-1, 1)
+    elseif direction == 6 then
+        return Vector.new(-1, 0)
+    elseif direction == 7 then
+        return Vector.new(-1, -1)
+    else
+        print_log("direction " .. direction .. "has no corresponding vector :( ???")
+        return nil
+    end
+end
+
+--- @return defines.direction
+function Vector:toDirection()
+    if self.x == 0 and self.y == -1 then
+        return 0
+    elseif self.x == 1 and self.y == -1 then
+        return 1
+    elseif self.x == 1 and self.y == 0 then
+        return 2
+    elseif self.x == 1 and self.y == 1 then
+        return 3
+    elseif self.x == 0 and self.y == 1 then
+        return 4
+    elseif self.x == -1 and self.y == 1 then
+        return 5
+    elseif self.x == -1 and self.y == 0 then
+        return 6
+    elseif self.x == -1 and self.y == -1 then
+        return 7
+    else
+        print_log("Vector has no corresponding direction :( ???")
+        return nil
+    end
+end
+
+--- @return Vector
+function Vector:reverse()
+    return Vector.new(self.x * -1, self.y * -1)
+end
+
+--- @return Vector
+function Vector:__add(other)
+    return Vector.new(self.x + other.x, self.y + other.y)
+end
+
+--- @return Vector
+function Vector.__sub(other)
+    return Vector.new(self.x - other.x, self.y - other.y)
 end
 
 --- @generic T

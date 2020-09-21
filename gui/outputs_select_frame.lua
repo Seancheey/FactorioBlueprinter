@@ -105,7 +105,7 @@ local function create_outputs_select_tab(player_index, tab_pane)
     tab_pane.add_tab(output_tab, output_flow)
 end
 
-CraftingUnitSelectTab = {}
+local CraftingUnitSelectTab = {}
 
 --- @param recipe_max_repetition number
 --- @param gui_parent LuaGuiElement
@@ -113,7 +113,7 @@ CraftingUnitSelectTab = {}
 function CraftingUnitSelectTab.create_repeat_num_selector(player_index, gui_parent, repetition_num_pointer, recipe_max_repetition)
     assertAllTruthy(player_index, gui_parent, repetition_num_pointer, recipe_max_repetition)
 
-    local repeat_num_frame = gui_parent.add { name = "repeat_num_frame", type = "frame", direction = "horizontal", caption = "Repeat unit" }
+    local repeat_num_frame = gui_parent.add { name = "repeat_num_frame", type = "frame", direction = "horizontal", caption = "Choose unit number" }
     repeat_num_frame.add { name = "repeat_num_label", type = "label", caption = "repeat unit" }
     local repeat_num_field = repeat_num_frame.add { name = "repeat_num_field", type = "textfield", numeric = true, allow_decimal = false }
     repeat_num_frame.add { name = "repeat_times_label", type = "label", caption = "times" }
@@ -121,7 +121,7 @@ function CraftingUnitSelectTab.create_repeat_num_selector(player_index, gui_pare
     repeat_num_field.text = tostring(Pointer.get(repetition_num_pointer))
     local repeat_num_slider = repeat_num_frame.add { name = "repeat_num_slider", type = "slider", minimum_value = 1, maximum_value = 10, value = 1, value_step = 1, discrete_slider = true, discrete_values = true }
     repeat_num_slider.style.maximal_width = 80
-    repeat_num_slider.set_slider_minimum_maximum(1, recipe_max_repetition)
+    repeat_num_slider.set_slider_minimum_maximum(1, (recipe_max_repetition > 100) and 100 or recipe_max_repetition)
     repeat_num_frame.add { name = "max_repetition_lavel", type = "label", caption = "(capacity: " .. tostring(recipe_max_repetition) .. ")" }
     register_gui_event_handler(player_index, repeat_num_field, defines.events.on_gui_text_changed, function(e)
         local new_repeat = tonumber(e.element.text)
@@ -153,7 +153,9 @@ function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, r
 
     local confirm_button = gui_parent.add { name = "confirm_button", type = "button", caption = "Confirm" }
     register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click, function(e)
-        local blueprint_section = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit():repeat_self(Pointer.get(repetition_pointer))
+        local new_unit, _, direction_spec = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit()
+        local blueprint_section = new_unit:repeat_self(Pointer.get(repetition_pointer))
+        blueprint_section:rotate(direction_spec.blueprintRotation)
         local blueprint = insert_blueprint(e.player_index, blueprint_section.entities)
         if blueprint then
             blueprint.label = recipe.name .. " crafting unit"
@@ -164,44 +166,114 @@ function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, r
     return confirm_button
 end
 
---- @class BlueprintDirectionSpec
---- @field ingredientDirection defines.direction
---- @field productPosition defines.direction
---- @field productDirection defines.direction
+local direction_table = { [0] = "hint_arrow_up", [2] = "hint_arrow_right", [4] = "hint_arrow_down", [6] = "hint_arrow_left" }
+local function direction_sprite(direction)
+    return direction_table[direction] and ("utility/" .. direction_table[direction]) or nil
+end
 
 --- @param gui_parent LuaGuiElement
 --- @return LuaGuiElement
-function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_parent)
-    assertAllTruthy(player_index, gui_parent)
+function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_parent, crafting_machine_name)
+    assertAllTruthy(player_index, gui_parent, crafting_machine_name)
 
-    local direction_frame = gui_parent.add { name = "direction_select_frame", type = "frame", direction = "vertical", caption = "Ingredients and Products flow direction" }
+    local direction_frame = gui_parent.add { name = "direction_select_frame", type = "frame", direction = "vertical", caption = "Choose flow direction" }
     do
-        direction_frame.add { name = "belt_direction_label", type = "label", caption = "Select crafting unit's belt direction:" }
-        local belt_direction_table = direction_frame.add { name = "belt_direction_table", type = "table", column_count = 4 }
-        local belt_direction_preference = PlayerInfo.get_belt_direction(player_index)
-        belt_direction_table.add { name = "left_label", type = "label", caption = "left" }
-        local left_button = belt_direction_table.add { name = "left_button", type = "radiobutton", state = belt_direction_preference == defines.direction.west }
+        direction_frame.add { name = "belt_direction_label", type = "label", caption = "Change input direction by clicking arrows in edges" }
+        direction_frame.add { name = "output_direction_label", type = "label", caption = "Change output direction by clicking arrows in corners" }
+        local choose_direction_tables_flow = direction_frame.add { name = "choose_direction_tables_flow", type = "flow", direction = "horizontal" }
+        do
+            --- @type table<defines.direction, LuaGuiElement>
+            local preview_sprites = {}
+            --- @type table<defines.direction, LuaGuiElement>
+            local direction_buttons = {}
 
-        belt_direction_table.add { name = "right_label", type = "label", caption = "right" }
-        local right_button = belt_direction_table.add { name = "right_button", type = "radiobutton", state = belt_direction_preference == defines.direction.east }
+            --- update the direction preference for the player
+            --- @param pressed_button_pos defines.direction position of the button that's pressed
+            local function update_direction_preference(pressed_button_pos)
+                local direction_spec = PlayerInfo.direction_settings(player_index)
+                if pressed_button_pos % 2 == 0 then
+                    direction_spec.ingredientDirection = Vector.fromDirection(pressed_button_pos):reverse():toDirection()
+                    -- if pressed button is input direction button, update the position and direction of outputs
+                    local direction_shift = (pressed_button_pos % 4 == 0) and -1 or 1
+                    for output_button_pos = 1, 7, 2 do
+                        local new_output_direction = (output_button_pos + direction_shift) % 8
+                        direction_buttons[output_button_pos].sprite = direction_sprite(new_output_direction)
+                        if preview_sprites[output_button_pos].sprite ~= "" then
+                            preview_sprites[output_button_pos].sprite = direction_buttons[output_button_pos].sprite
+                            direction_spec.productDirection = new_output_direction
+                            direction_spec.productPosition = (new_output_direction - 2 * direction_shift) % 8
+                        end
+                        direction_shift = direction_shift * -1
+                    end
+                else
+                    local input_button_pos
+                    for i = 0, 6, 2 do
+                        if preview_sprites[i].sprite ~= "" then
+                            input_button_pos = i
+                            break
+                        end
+                    end
+                    local input_direction_vector = Vector.fromDirection(input_button_pos):reverse()
+                    local output_button_pos_vector = Vector.fromDirection(pressed_button_pos)
+                    direction_spec.productDirection = Vector.new(
+                            input_direction_vector.x == 0 and 0 or output_button_pos_vector.x,
+                            input_direction_vector.y == 0 and 0 or output_button_pos_vector.y
+                    )                                       :toDirection()
+                    direction_spec.productPosition = Vector.new(
+                            input_direction_vector.x == 0 and output_button_pos_vector.x or 0,
+                            input_direction_vector.y == 0 and output_button_pos_vector.y or 0
+                    )                                      :toDirection()
+                end
+                preview_sprites[pressed_button_pos].sprite = direction_buttons[pressed_button_pos].sprite
+                for other_same_type_button_offset = 2, 6, 2 do
+                    preview_sprites[(pressed_button_pos + other_same_type_button_offset) % 8].sprite = nil
+                end
+            end
 
-        register_gui_event_handler(player_index, left_button, defines.events.on_gui_click, function(e)
-            left_button.state = true
-            right_button.state = false
-            PlayerInfo.set_belt_direction(e.player_index, defines.direction.west)
-        end)
+            local belt_direction_table = choose_direction_tables_flow.add { name = "belt_direction_table", type = "table", column_count = 3 }
+            belt_direction_table.style.left_margin = 20
+            for _, direction in ipairs({ 7, 0, 1, 6, -1, 2, 5, 4, 3 }) do
+                if direction >= 0 then
+                    -- 4 inputs direction button should reverse its arrow direction, other 4 outputs direction button should stay the same
+                    local arrow_direction = (direction % 2 == 0) and ((direction + 4) % 8) or direction
+                    direction_buttons[direction] = belt_direction_table.add { type = "sprite-button", name = "direction_button_" .. tostring(direction), sprite = direction_sprite(arrow_direction) }
+                    register_gui_event_handler(player_index, direction_buttons[direction], defines.events.on_gui_click, function()
+                        -- create a mapping from (4 input direction + 4 output direction) to (inputs belt left/right + outputs belt left/right + 4 rotation)
+                        update_direction_preference(direction)
+                    end)
+                else
+                    -- center of the table is a crafting machine icon
+                    belt_direction_table.add { type = "sprite-button", name = "crafting_machine_sprite", sprite = sprite_of(crafting_machine_name), ignored_by_interaction = true }
+                end
+            end
+            local preview_flow = choose_direction_tables_flow.add { name = "preview_frame", type = "table", direction = "vertical", column_count = 1, draw_horizontal_line_after_headers = true }
+            preview_flow.style.left_margin = 20
+            do
+                preview_flow.add { name = "preview_label", type = "label", caption = "Preview" }
+                local preview_table = preview_flow.add { name = "preview_table", type = "table", column_count = 3 }
+                local sprite_size = 28
+                for _, direction in ipairs({ 7, 0, 1, 6, -1, 2, 5, 4, 3 }) do
+                    if direction >= 0 then
+                        preview_sprites[direction] = preview_table.add { type = "sprite", name = "direction_" .. tostring(direction) }
+                        preview_sprites[direction].style.minimal_height = sprite_size
+                        preview_sprites[direction].style.minimal_width = sprite_size
+                        preview_sprites[direction].style.stretch_image_to_widget_size = true
+                    else
+                        -- center of the table is a crafting machine icon
+                        local crafting_machine_sprite = preview_table.add { type = "sprite", name = "crafting_machine_sprite", sprite = sprite_of(crafting_machine_name), ignored_by_interaction = true }
+                        crafting_machine_sprite.style.minimal_height = sprite_size
+                        crafting_machine_sprite.style.minimal_width = sprite_size
+                        crafting_machine_sprite.style.stretch_image_to_widget_size = true
+                    end
+                end
+            end
 
-        register_gui_event_handler(player_index, right_button, defines.events.on_gui_click, function(e)
-            left_button.state = false
-            right_button.state = true
-            PlayerInfo.set_belt_direction(e.player_index, defines.direction.east)
-        end)
+            -- Preset default direction preference
+            update_direction_preference(defines.direction.west)
+            update_direction_preference(defines.direction.northeast)
+        end
     end
     return direction_frame
-end
-
-function CraftingUnitSelectTab.remove_all()
-
 end
 
 --- @param tab_pane LuaGuiElement
@@ -228,7 +300,7 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
                 local recipe = game.recipe_prototypes[e.element.elem_value]
                 local blueprint, max_repetition_num = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit()
                 if blueprint and max_repetition_num then
-                    direction_frame = CraftingUnitSelectTab.create_direction_select_frame(player_index, crafting_unit_flow)
+                    direction_frame = CraftingUnitSelectTab.create_direction_select_frame(player_index, crafting_unit_flow, PlayerInfo.get_crafting_machine_prototype(player_index, recipe).name)
                     local repetition_pointer = Pointer.new(1)
                     if max_repetition_num > 1 then
                         repeat_num_selector = CraftingUnitSelectTab.create_repeat_num_selector(player_index, crafting_unit_flow, repetition_pointer, max_repetition_num)

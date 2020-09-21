@@ -104,7 +104,7 @@ function BlueprintSection:width()
             max = test_max
         end
     end
-    local width = (max or 0) - (min or 0)
+    local width = math.floor((max or 0) - (min or 0))
     return width
 end
 
@@ -136,16 +136,37 @@ function BlueprintSection:repeat_self(n_times)
     return self
 end
 
+local rotate_matrices = { [0] = function(x, y)
+    return { x = x, y = y }
+end, [1] = function(x, y)
+    return { x = y, y = -x }
+end, [2] = function(x, y)
+    return { x = -x, y = -y }
+end, [3] = function(x, y)
+    return { x = -y, y = x }
+end }
+
+-- rotate clockwise 90*n degrees
+function BlueprintSection:rotate(n)
+    n = -n % 4
+    local rotate_func = rotate_matrices[n]
+    for _, entity in ipairs(self.entities) do
+        local prototype = game.entity_prototypes[entity.name]
+        -- entity with even number of width/height will have a small centering offset
+        local x_offset = (math.ceil(prototype.selection_box.right_bottom.x - prototype.selection_box.left_top.x + 1) % 2) / 2
+        local y_offset = (math.ceil(prototype.selection_box.right_bottom.y - prototype.selection_box.left_top.y + 1) % 2) / 2
+        if entity.name == "stone-furnace" then
+            print_log("before position: " .. serpent.line(entity.position))
+        end
+        entity.position = rotate_func(entity.position.x - x_offset, entity.position.y - y_offset)
+        if entity.name == "stone-furnace" then
+            print_log("after position: " .. serpent.line(entity.position))
+        end
+        entity.direction = ((entity.direction or 0) - 2 * n) % 8
+    end
+end
+
 ALL_BELTS = { "transport-belt", "fast-transport-belt", "express-transport-belt" }
-INSERTER_SPEEDS = {
-    ["burner-inserter"] = 0.6,
-    ["inserter"] = 0.83,
-    ["long-handed-inserter"] = 1.2,
-    ["fast-inserter"] = 2.31,
-    ["filter-inserter"] = 2.31,
-    ["stack-inserter"] = 2.31,
-    ["stack-filter-inserter"] = 2.31
-}
 
 --- @class AssemblerNode represent a group of crafting machines for crafting a single recipe
 --- @field recipe LuaRecipePrototype
@@ -175,7 +196,7 @@ function AssemblerNode.new(o)
 end
 
 --- generate a blueprint section with a single crafting machine unit
---- @return BlueprintSection
+--- @return BlueprintSection, number, InternalDirectionSpec
 function AssemblerNode:generate_crafting_unit()
     local section = BlueprintSection.new()
     local crafting_machine = PlayerInfo.get_crafting_machine_prototype(self.player_index, self.recipe)
@@ -184,7 +205,6 @@ function AssemblerNode:generate_crafting_unit()
     local crafter_height = math.ceil(crafting_machine.selection_box.right_bottom.y - crafting_machine.selection_box.left_top.y)
     --- ideal crafting speed of the recipe, unit is recipe/second
     local ideal_crafting_speed = crafting_machine.crafting_speed / self.recipe.energy
-    local belt_direction = PlayerInfo.get_belt_direction(self.player_index)
 
     section:add({
         -- set top-left corner of crafting machine to 0,0
@@ -271,7 +291,7 @@ function AssemblerNode:generate_crafting_unit()
     --- @field type '"fluid"' | '"item"'
 
     --- @param recipe LuaRecipePrototype
-    --- @return TransportLineInfo[]
+    --- @return TransportLineInfo[] | ArrayList
     function create_transport_line_info_list(recipe)
         --- @type TransportLineInfo[]|ArrayList
         local item_info_list = ArrayList.new()
@@ -312,6 +332,15 @@ function AssemblerNode:generate_crafting_unit()
 
     local transport_line_infos = create_transport_line_info_list(self.recipe)
 
+    local direction_spec
+    -- determine the directions of transport belts
+    do
+        local item_line_num = #transport_line_infos:filter(function(line_info)
+            return line_info.type == "item"
+        end)
+        local item_output_direction = item_line_num % 2 == 0 and defines.direction.south or defines.direction.north
+        direction_spec = PlayerInfo.get_internal_direction_spec(self.player_index, item_output_direction)
+    end
     -- concatenate ingredients and products together
     for _, line_info in ipairs(transport_line_infos) do
         -- find next available transporting line to fill
@@ -322,7 +351,7 @@ function AssemblerNode:generate_crafting_unit()
                 local corresponding_fluid_box_position = fluid_box_positions[line_info.direction][fluid_box_indices[line_info.direction]]
                 -- pre-check for any crafting machine prototypes with unknown fluid box support
                 if line_info.type == "fluid" and corresponding_fluid_box_position == nil then
-                    print_log("This mod recipe needs fluid box connection, which is not supported by the mod yet. Failed to make blueprint :(", logging.E)
+                    print_log("This mod recipe's crafting machine needs fluid box connection, which is not supported by the mod yet. Consider prioritize a built-in crafting machine instead? Failed to make blueprint :(", logging.E)
                     print_log("You can add support for this recipe by contributing it's fluid box connections in github: https://github.com/Seancheey/FactorioBlueprinter/blob/master/prototype_info.lua")
                     return
                 end
@@ -351,8 +380,7 @@ function AssemblerNode:generate_crafting_unit()
                     for x = 0, crafter_width - 1, 1 do
                         section:add({
                             name = "pipe",
-                            position = { x = x, y = y },
-                            direction = belt_direction
+                            position = { x = x, y = y }
                         })
                     end
 
@@ -386,7 +414,7 @@ function AssemblerNode:generate_crafting_unit()
                         section:add({
                             name = preferred_belt.name,
                             position = { x = x, y = y },
-                            direction = belt_direction
+                            direction = line_info.direction == "input" and direction_spec.linearIngredientDirection or direction_spec.linearOutputDirection
                         })
                     end
                     local connection_y = y > 0 and crafter_height or -1
@@ -471,7 +499,7 @@ function AssemblerNode:generate_crafting_unit()
                 -- initialize inlet/outlet table if entry not exists
                 if not spec_table[connection_spec.transport_line_y] then
                     local connection_point_x = (
-                            (PlayerInfo.get_belt_direction(self.player_index) == defines.direction.east) == (connection_spec.line_info.direction == "input")
+                            (direction_spec.linearIngredientDirection == defines.direction.east) == (connection_spec.line_info.direction == "input")
                     ) and (crafter_width - 1) or 0
                     spec_table[connection_spec.transport_line_y] = {
                         position = Coordinate(connection_point_x, connection_spec.transport_line_y),
@@ -526,7 +554,7 @@ function AssemblerNode:generate_crafting_unit()
         end
     end
 
-    return section, max_speed_unit_repetition_num
+    return section, max_speed_unit_repetition_num, direction_spec
 end
 
 --- @return BlueprintSection
