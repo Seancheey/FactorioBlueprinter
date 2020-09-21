@@ -104,7 +104,7 @@ function BlueprintSection:width()
             max = test_max
         end
     end
-    local width = (max or 0) - (min or 0)
+    local width = math.floor((max or 0) - (min or 0))
     return width
 end
 

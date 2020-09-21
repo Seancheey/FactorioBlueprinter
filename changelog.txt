@@ -5,6 +5,7 @@ Date: 2020.09.20
     - Add support to choose blueprint input direction and output direction
   Bugfixes:
     - Fix bug that makes full fluid crafting recipe crashes game
+    - Fix bug that calculates width of a crafting unit wrongly and makes some repeating units strangely
 
 ---------------------------------------------------------------------------------------------------
 Version: 0.6.0

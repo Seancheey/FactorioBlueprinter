@@ -171,6 +171,9 @@ end
 
 --- @return BlueprintDirectionSpec a modifiable direction specification
 function PlayerInfo.direction_settings(player_index)
+    if not global.settings[player_index].direction_spec then
+        global.settings[player_index].direction_spec = { productPosition = 0, productDirection = 0, ingredientDirection = 0 }
+    end
     return global.settings[player_index].direction_spec
 end
 
