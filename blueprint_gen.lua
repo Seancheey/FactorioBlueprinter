@@ -38,15 +38,16 @@ function BlueprintSection:copy(xoff, yoff)
     xoff = xoff or 0
     yoff = yoff or 0
     --- @param old Entity
-    function shifted_entity(old)
-        local entity = deep_copy(old)
-        entity.position.x = entity.position.x + xoff
-        entity.position.y = entity.position.y + yoff
-        return entity
+    function shift_func(old)
+        local new = deep_copy(old)
+        new.position.x = new.position.x + xoff
+        new.position.y = new.position.y + yoff
+        return new
     end
     local new_section = BlueprintSection.new()
-    new_section.entities = toArrayList(self.entities):map(shifted_entity)
-    -- TODO also update inlets/outlets
+    new_section.entities = toArrayList(self.entities):map(shift_func)
+    new_section.inlets = toArrayList(self.inlets):map(shift_func)
+    new_section.outlets = toArrayList(self.outlets):map(shift_func)
     return new_section
 end
 
@@ -57,31 +58,46 @@ function BlueprintSection:add(entity)
     self.entities[entity.entity_number] = entity
 end
 
+--- @param section BlueprintSection
+function BlueprintSection:addSection(section)
+    assertAllTruthy(self, section)
+
+    for _, entity in ipairs(section.entities) do
+        self:add(deep_copy(entity))
+    end
+    for _, inlet in ipairs(section.inlets) do
+        self.inlets:add(deep_copy(inlet))
+    end
+    for _, outlet in ipairs(section.outlets) do
+        self.inlets:add(deep_copy(outlet))
+    end
+end
+
 --- concatenate with another section, assuming that self's outlets and other's inlets are connected.
 --- If no offsets are provided, default to concatenate other to right side.
 --- @param other BlueprintSection
 --- @param xoff number optional, x-offset of the other section, default to width of self
---- @param yoff number optional, y-offset of the other section, default to 0
 --- @return BlueprintSection new self
-function BlueprintSection:concat(other, xoff, yoff)
+function BlueprintSection:concat(other, xoff)
     assertAllTruthy(self, other)
     xoff = xoff or self:width()
-    yoff = yoff or 0
 
     self.outlets = {}
     for _, entity in ipairs(other.entities) do
         local new_entity = deep_copy(entity)
         new_entity.position.x = new_entity.position.x + xoff
-        new_entity.position.y = new_entity.position.y + yoff
         self:add(new_entity)
-        -- TODO also add outlet transform
+    end
+
+    local outlet_increase = other:width()
+    for _, outlet in ipairs(self.outlets) do
+        outlet.position.x = outlet.position.x + outlet_increase
     end
 
     return self
 end
 
 function BlueprintSection:width()
-    -- TODO verify width calculation
     local min, max
     for _, entity in ipairs(self.entities) do
         test_min = entity.position.x + game.entity_prototypes[entity.name].selection_box.left_top.x
@@ -97,10 +113,41 @@ function BlueprintSection:width()
     return width
 end
 
+function BlueprintSection:height()
+    local min, max
+    for _, entity in ipairs(self.entities) do
+        test_min = entity.position.y + game.entity_prototypes[entity.name].selection_box.left_top.y
+        if not min or test_min < min then
+            min = test_min
+        end
+        test_max = entity.position.y + game.entity_prototypes[entity.name].selection_box.right_bottom.y
+        if not max or test_max > max then
+            max = test_max
+        end
+    end
+    local height = math.floor((max or 0) - (min or 0) + 0.5)
+    return height
+end
+
+function BlueprintSection:shift(x_off, y_off)
+    for _, entity in ipairs(self.entities) do
+        entity.position.x = entity.position.x + x_off
+        entity.position.y = entity.position.y + y_off
+    end
+    for _, inlet in ipairs(self.inlets) do
+        inlet.position.x = inlet.position.x + x_off
+        inlet.position.y = inlet.position.y + y_off
+    end
+    for _, outlet in ipairs(self.outlets) do
+        outlet.position.x = outlet.position.x + x_off
+        outlet.position.y = outlet.position.y + y_off
+    end
+end
+
 --- clear overlapped units, last-in entity get saved
 function BlueprintSection:clear_overlap()
     local position_dict = {}
-    for _, entity in pairs(self.entities) do
+    for _, entity in ipairs(self.entities) do
         local pos = tostring(entity.position[1] or entity.position.x) .. "," .. tostring(entity.position[2] or entity.position.y)
         position_dict[pos] = entity
     end
@@ -196,7 +243,7 @@ function AssemblerNode:generate_crafting_unit()
     --- ideal crafting speed of the recipe, unit is recipe/second
     local ideal_crafting_speed = crafting_machine.crafting_speed / self.recipe.energy
 
-    print_log("crafter_width = "..tostring(crafter_width) .. ", crafter_height = "..tostring(crafter_height))
+    print_log("crafter_width = " .. tostring(crafter_width) .. ", crafter_height = " .. tostring(crafter_height))
 
     section:add({
         -- set top-left corner of crafting machine to 0,0
@@ -530,6 +577,7 @@ function AssemblerNode:generate_crafting_unit()
     end
 
     local max_speed_unit_repetition_num = 1 / 0
+    local max_recipe_speed = 1 / 0
     --- @type ConnectionPoint[][]
     local all_connections = { section.inlets, section.outlets }
     for _, connections in ipairs(all_connections) do
@@ -542,20 +590,35 @@ function AssemblerNode:generate_crafting_unit()
                 if repetition < max_speed_unit_repetition_num then
                     max_speed_unit_repetition_num = repetition
                 end
+                if speed < max_recipe_speed then
+                    max_recipe_speed = speed
+                end
             end
         end
     end
-
-    return section, max_speed_unit_repetition_num, direction_spec
+    --print_log("inlets = " .. serpent.line(section.inlets) .. ",\n outlets = " .. serpent.line(section.outlets).. "\n ---")
+    return section, max_speed_unit_repetition_num, direction_spec, max_recipe_speed
 end
 
 --- @return BlueprintSection
 function AssemblerNode:generate_section()
+    local unit_section, max_unit_per_row, _, unit_crafting_speed = self:generate_crafting_unit()
+    local unit_needed = math.ceil(self.recipe_speed / unit_crafting_speed)
 
-    -- concatenate multiple crafting units horizontally to create a section
+    local section = BlueprintSection.new()
+    local unit_height = unit_section:height()
+    local y_shift = 0
+    while unit_needed > 0 do
+        local unit_num_in_row = (unit_needed >= max_unit_per_row) and max_unit_per_row or unit_needed
+        local new_unit_row = unit_section:copy():repeat_self(unit_num_in_row)
+        new_unit_row:shift(0, y_shift)
+        section:addSection(new_unit_row)
 
-    -- TODO use multiple units
-    return self:generate_crafting_unit()
+        y_shift = y_shift + unit_height
+        unit_needed = unit_needed - unit_num_in_row
+    end
+
+    return section
 end
 
 --- @class BlueprintGraph
