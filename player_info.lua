@@ -36,11 +36,6 @@ function PlayerInfo.unlocked_crafting_machines(player_index)
     return unlocked_factories
 end
 
---- @return LuaEntityPrototype[]
-function PlayerInfo.unlocked_belts(player_index)
-
-end
-
 --- @return table<number, LuaEntityPrototype[]> inserters table, keyed by insert arm length, list is ordered by inserter speed, ascending, this list doesn't contain any filter/burner inserter since we are not using them anyway
 function PlayerInfo.unlocked_inserters(player_index)
     --- @type LuaEntityPrototype[]
@@ -183,4 +178,40 @@ function PlayerInfo.set_default_settings(player_index)
         factory_priority = {},
         direction_spec = { ingredientDirection = defines.direction.east, productDirection = defines.direction.east, productPosition = defines.direction.north }
     }
+end
+
+--- checks for newly unlocked crafting machines and add it to the priority list
+function PlayerInfo.update_crafting_machine_priorities(player_index)
+    local unlocked_factories = PlayerInfo.unlocked_crafting_machines(player_index)
+    local factory_priority = PlayerInfo.crafting_machine_priorities(player_index)
+
+    for _, unlocked_factory in ipairs(unlocked_factories) do
+        if not ArrayList.has(factory_priority, unlocked_factory, function(a, b)
+            return a.name == b.name
+        end) then
+            ArrayList.insert(factory_priority, unlocked_factory)
+        end
+    end
+end
+
+--- insert an blueprint to player's inventory, fail if inventory is full
+--- @param player_index player_index
+--- @param entities Entity[]
+--- @return nil|LuaItemStack nilable, item stack representing the blueprint in the player's inventory
+function PlayerInfo.insert_blueprint(player_index, entities)
+    assertAllTruthy(player_index, entities)
+
+    local player_inventory = game.players[player_index].get_main_inventory()
+    if not player_inventory.can_insert("blueprint") then
+        print_log("player's inventory is full, can't insert a new blueprint", logging.I)
+        return
+    end
+    player_inventory.insert("blueprint")
+    for i = 1, #player_inventory, 1 do
+        local item = player_inventory[i]
+        if item.is_blueprint and not item.is_blueprint_setup() then
+            item.set_blueprint_entities(entities)
+            return item
+        end
+    end
 end

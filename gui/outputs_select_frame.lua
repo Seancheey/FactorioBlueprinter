@@ -40,7 +40,7 @@ local function add_output_item_selection_box(player_index, parent, outputs_speci
 end
 
 local function create_settings_tab(player_index, tab_pane)
-    update_player_crafting_machine_priorities(player_index)
+    PlayerInfo.update_crafting_machine_priorities(player_index)
 
     local setting_tab = tab_pane.add { type = "tab", name = "setting_tab", caption = "settings" }
     local vertical_flow = tab_pane.add { type = "flow", name = "vertical_flow", direction = "vertical" }
@@ -156,7 +156,7 @@ function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, r
         local new_unit, _, direction_spec = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit()
         local blueprint_section = new_unit:repeat_self(Pointer.get(repetition_pointer))
         blueprint_section:rotate(direction_spec.blueprintRotation)
-        local blueprint = insert_blueprint(e.player_index, blueprint_section.entities)
+        local blueprint = PlayerInfo.insert_blueprint(e.player_index, blueprint_section.entities)
         if blueprint then
             blueprint.label = recipe.name .. " crafting unit"
             game.players[e.player_index].print("blueprint \"" .. blueprint.label .. "\" created.")

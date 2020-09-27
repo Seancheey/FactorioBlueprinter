@@ -136,18 +136,18 @@ function BlueprintSection:repeat_self(n_times)
     return self
 end
 
-local rotate_matrices = { [0] = function(x, y)
-    return { x = x, y = y }
-end, [1] = function(x, y)
-    return { x = y, y = -x }
-end, [2] = function(x, y)
-    return { x = -x, y = -y }
-end, [3] = function(x, y)
-    return { x = -y, y = x }
-end }
-
 -- rotate clockwise 90*n degrees
 function BlueprintSection:rotate(n)
+    local rotate_matrices = { [0] = function(x, y)
+        return { x = x, y = y }
+    end, [1] = function(x, y)
+        return { x = y, y = -x }
+    end, [2] = function(x, y)
+        return { x = -x, y = -y }
+    end, [3] = function(x, y)
+        return { x = -y, y = x }
+    end }
+
     n = -n % 4
     local rotate_func = rotate_matrices[n]
     for _, entity in ipairs(self.entities) do
@@ -651,7 +651,7 @@ end
 function BlueprintGraph:generate_blueprint()
     -- TODO use full blueprint rather then first output
     for _, output_node in pairs(self.outputs) do
-        insert_blueprint(self.player_index, output_node:generate_section().entities)
+        PlayerInfo.insert_blueprint(self.player_index, output_node:generate_section().entities)
         break
     end
 end
@@ -752,39 +752,4 @@ function BlueprintGraph:__ingredient_fully_used_by(ingredient_name, item_list)
     return products:all(function(p)
         return self:__ingredient_fully_used_by(p, item_list)
     end)
-end
-
---- insert an blueprint to player's inventory, fail if inventory is full
---- @param player_index player_index
---- @param entities Entity[]
---- @return nil|LuaItemStack nilable, item stack representing the blueprint in the player's inventory
-function insert_blueprint(player_index, entities)
-    assertAllTruthy(player_index, entities)
-
-    local player_inventory = game.players[player_index].get_main_inventory()
-    if not player_inventory.can_insert("blueprint") then
-        print_log("player's inventory is full, can't insert a new blueprint", logging.I)
-        return
-    end
-    player_inventory.insert("blueprint")
-    for i = 1, #player_inventory, 1 do
-        local item = player_inventory[i]
-        if item.is_blueprint and not item.is_blueprint_setup() then
-            item.set_blueprint_entities(entities)
-            return item
-        end
-    end
-end
-
-function update_player_crafting_machine_priorities(player_index)
-    local unlocked_factories = PlayerInfo.unlocked_crafting_machines(player_index)
-    local factory_priority = PlayerInfo.crafting_machine_priorities(player_index)
-
-    for _, unlocked_factory in ipairs(unlocked_factories) do
-        if not ArrayList.has(factory_priority, unlocked_factory, function(a, b)
-            return a.name == b.name
-        end) then
-            ArrayList.insert(factory_priority, unlocked_factory)
-        end
-    end
 end
