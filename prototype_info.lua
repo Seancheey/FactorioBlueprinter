@@ -107,9 +107,9 @@ end
 
 PrototypeInfo = {}
 --- @param prototype LuaEntityPrototype
---- @return Dimension
+--- @return Vector2D
 function PrototypeInfo.get_size(prototype)
-    return Dimension.new(
+    return Vector2D.new(
             math.floor(prototype.selection_box.right_bottom.x - prototype.selection_box.left_top.x + 0.5),
             math.floor(prototype.selection_box.right_bottom.y - prototype.selection_box.left_top.y + 0.5)
     )

@@ -8,12 +8,12 @@ require("player_info")
 --- @class Entity
 --- @field entity_number number unique identifier of entity
 --- @field name string entity name
---- @field position Dimension
+--- @field position Vector2D
 --- @field direction any defines.direction.east/south/west/north
 
 --- @class ConnectionPoint
 --- @field ingredients table<ingredient_name, number> ingredients that the connection point is transporting to number of items transported per second
---- @field position Dimension
+--- @field position Vector2D
 --- @field connection_entity LuaEntityPrototype
 
 --- @class BlueprintSection
@@ -234,7 +234,7 @@ function AssemblerNode:generate_crafting_unit()
     --- @field transport_line_y number the connection point's corresponding transport line
     --- @field line_info TransportLineInfo transport line information
 
-    --- @type table<Dimension, ConnectionSpec> connection entity specification table which is keyed by its coordinate
+    --- @type table<Vector2D, ConnectionSpec> connection entity specification table which is keyed by its coordinate
     local connection_positions = setmetatable({}, { __index = function(t, k)
         for test_key, v in pairs(t) do
             if test_key == k then
@@ -247,14 +247,14 @@ function AssemblerNode:generate_crafting_unit()
         -- populate all connection positions
         for _, y in ipairs({ -1, crafter_height }) do
             for x = 0, crafter_width - 1, 1 do
-                connection_positions[Dimension.new(x, y)] = {
+                connection_positions[Vector2D.new(x, y)] = {
                     replaceable = true
                 }
             end
         end
     end
 
-    --- @type table<'"input"'|'"output"', ArrayList|Dimension[]> fluid connection point positions of the crafting machine, if available
+    --- @type table<'"input"'|'"output"', ArrayList|Vector2D[]> fluid connection point positions of the crafting machine, if available
     local fluid_box_positions = {}
     for _, connection_type in ipairs({ "output", "input" }) do
         fluid_box_positions[connection_type] = toArrayList(crafting_machine.fluid_boxes)
@@ -265,7 +265,7 @@ function AssemblerNode:generate_crafting_unit()
                 end)
                 :map(
                 function(b)
-                    local connection_position = Dimension.new(
+                    local connection_position = Vector2D.new(
                             b.pipe_connections[1].position[1] + math.floor(crafter_width / 2),
                             b.pipe_connections[1].position[2] + math.floor(crafter_height / 2)
                     )
@@ -494,7 +494,7 @@ function AssemblerNode:generate_crafting_unit()
                             (direction_spec.linearIngredientDirection == defines.direction.east) == (connection_spec.line_info.direction == "input")
                     ) and (crafter_width - 1) or 0
                     spec_table[connection_spec.transport_line_y] = {
-                        position = Dimension.new(connection_point_x, connection_spec.transport_line_y),
+                        position = Vector2D.new(connection_point_x, connection_spec.transport_line_y),
                         entity = connection_spec.line_info.type == "item" and preferred_belt or game.entity_prototypes["pipe"],
                         ingredients = ArrayList.mapToTable(connection_spec.line_info.crafting_items, function(x)
                             return x.name, 0

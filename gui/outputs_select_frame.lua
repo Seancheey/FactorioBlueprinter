@@ -192,7 +192,7 @@ function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_p
             local function update_direction_preference(pressed_button_pos)
                 local direction_spec = PlayerInfo.direction_settings(player_index)
                 if pressed_button_pos % 2 == 0 then
-                    direction_spec.ingredientDirection = Vector.fromDirection(pressed_button_pos):reverse():toDirection()
+                    direction_spec.ingredientDirection = Vector2D.fromDirection(pressed_button_pos):reverse():toDirection()
                     -- if pressed button is input direction button, update the position and direction of outputs
                     local direction_shift = (pressed_button_pos % 4 == 0) and -1 or 1
                     for output_button_pos = 1, 7, 2 do
@@ -213,16 +213,16 @@ function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_p
                             break
                         end
                     end
-                    local input_direction_vector = Vector.fromDirection(input_button_pos):reverse()
-                    local output_button_pos_vector = Vector.fromDirection(pressed_button_pos)
-                    direction_spec.productDirection = Vector.new(
+                    local input_direction_vector = Vector2D.fromDirection(input_button_pos):reverse()
+                    local output_button_pos_vector = Vector2D.fromDirection(pressed_button_pos)
+                    direction_spec.productDirection = Vector2D.new(
                             input_direction_vector.x == 0 and 0 or output_button_pos_vector.x,
                             input_direction_vector.y == 0 and 0 or output_button_pos_vector.y
-                    )                                       :toDirection()
-                    direction_spec.productPosition = Vector.new(
+                    )                                         :toDirection()
+                    direction_spec.productPosition = Vector2D.new(
                             input_direction_vector.x == 0 and output_button_pos_vector.x or 0,
                             input_direction_vector.y == 0 and output_button_pos_vector.y or 0
-                    )                                      :toDirection()
+                    )                                        :toDirection()
                 end
                 preview_sprites[pressed_button_pos].sprite = direction_buttons[pressed_button_pos].sprite
                 for other_same_type_button_offset = 2, 6, 2 do

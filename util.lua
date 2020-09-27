@@ -237,55 +237,40 @@ function sprite_of(name)
     end
 end
 
---- @class Vector
+--- @class Vector2D
 --- @field x number
 --- @field y number
 
---- @class Dimension
---- @field x number
---- @field y number
-Dimension = {}
-Dimension.__index = Dimension
+--- @type Vector2D
+Vector2D = {}
+Vector2D.__index = Vector2D
 
-function Dimension.__eq(ca, cb)
-    return ca.x == cb.x and ca.y == cb.y
-end
-
---- @return Dimension a comparable coordinate object
-function Dimension.new(x, y)
-    return setmetatable({ x = x, y = y }, Dimension)
-end
-
---- @type Vector
-Vector = {}
-Vector.__index = Vector
-
---- @return Vector
-function Vector.new(x, y)
-    return setmetatable({ x = x or 0, y = y or 0 }, Vector)
+--- @return Vector2D
+function Vector2D.new(x, y)
+    return setmetatable({ x = x or 0, y = y or 0 }, Vector2D)
 end
 
 --- @param direction defines.direction
---- @return Vector
-function Vector.fromDirection(direction)
+--- @return Vector2D
+function Vector2D.fromDirection(direction)
     assertAllTruthy(direction)
 
     if direction == 0 then
-        return Vector.new(0, -1)
+        return Vector2D.new(0, -1)
     elseif direction == 1 then
-        return Vector.new(1, -1)
+        return Vector2D.new(1, -1)
     elseif direction == 2 then
-        return Vector.new(1, 0)
+        return Vector2D.new(1, 0)
     elseif direction == 3 then
-        return Vector.new(1, 1)
+        return Vector2D.new(1, 1)
     elseif direction == 4 then
-        return Vector.new(0, 1)
+        return Vector2D.new(0, 1)
     elseif direction == 5 then
-        return Vector.new(-1, 1)
+        return Vector2D.new(-1, 1)
     elseif direction == 6 then
-        return Vector.new(-1, 0)
+        return Vector2D.new(-1, 0)
     elseif direction == 7 then
-        return Vector.new(-1, -1)
+        return Vector2D.new(-1, -1)
     else
         print_log("direction " .. direction .. "has no corresponding vector :( ???")
         return nil
@@ -293,7 +278,7 @@ function Vector.fromDirection(direction)
 end
 
 --- @return defines.direction
-function Vector:toDirection()
+function Vector2D:toDirection()
     if self.x == 0 and self.y == -1 then
         return 0
     elseif self.x == 1 and self.y == -1 then
@@ -316,20 +301,25 @@ function Vector:toDirection()
     end
 end
 
---- @return Vector
-function Vector:reverse()
-    return Vector.new(self.x * -1, self.y * -1)
+--- @return Vector2D
+function Vector2D:reverse()
+    return Vector2D.new(self.x * -1, self.y * -1)
 end
 
---- @return Vector
-function Vector:__add(other)
-    return Vector.new(self.x + other.x, self.y + other.y)
+--- @return Vector2D
+function Vector2D:__add(other)
+    return Vector2D.new(self.x + other.x, self.y + other.y)
 end
 
---- @return Vector
-function Vector.__sub(other)
-    return Vector.new(self.x - other.x, self.y - other.y)
+--- @return Vector2D
+function Vector2D.__sub(other)
+    return Vector2D.new(self.x - other.x, self.y - other.y)
 end
+
+function Vector2D.__eq(ca, cb)
+    return ca.x == cb.x and ca.y == cb.y
+end
+
 
 --- @generic T
 --- @param orig T
