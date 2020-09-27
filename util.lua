@@ -241,6 +241,21 @@ end
 --- @field x number
 --- @field y number
 
+--- @class Dimension
+--- @field x number
+--- @field y number
+Dimension = {}
+Dimension.__index = Dimension
+
+function Dimension.__eq(ca, cb)
+    return ca.x == cb.x and ca.y == cb.y
+end
+
+--- @return Dimension a comparable coordinate object
+function Dimension.new(x, y)
+    return setmetatable({ x = x, y = y }, Dimension)
+end
+
 --- @type Vector
 Vector = {}
 Vector.__index = Vector

@@ -104,3 +104,13 @@ function average_amount_of(crafting_item)
     assert(crafting_item.amount or crafting_item.amount_max, serpent.line(crafting_item) .. "has no amount or amount_max field")
     return crafting_item.amount or ((crafting_item.amount_max + crafting_item.amount_min) / 2)
 end
+
+PrototypeInfo = {}
+--- @param prototype LuaEntityPrototype
+--- @return Dimension
+function PrototypeInfo.get_size(prototype)
+    return Dimension.new(
+            math.floor(prototype.selection_box.right_bottom.x - prototype.selection_box.left_top.x + 0.5),
+            math.floor(prototype.selection_box.right_bottom.y - prototype.selection_box.left_top.y + 0.5)
+    )
+end

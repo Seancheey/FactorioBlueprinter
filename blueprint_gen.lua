@@ -5,19 +5,15 @@ require("player_info")
 --- @alias recipe_name string
 --- @alias ingredient_name string
 
---- @class Coordinate
---- @field x number
---- @field y number
-
 --- @class Entity
 --- @field entity_number number unique identifier of entity
 --- @field name string entity name
---- @field position Coordinate
+--- @field position Dimension
 --- @field direction any defines.direction.east/south/west/north
 
 --- @class ConnectionPoint
 --- @field ingredients table<ingredient_name, number> ingredients that the connection point is transporting to number of items transported per second
---- @field position Coordinate
+--- @field position Dimension
 --- @field connection_entity LuaEntityPrototype
 
 --- @class BlueprintSection
@@ -28,13 +24,6 @@ require("player_info")
 --- @type BlueprintSection
 BlueprintSection = {}
 BlueprintSection.__index = BlueprintSection
-
---- @return Coordinate a comparable coordinate object
-function Coordinate(x, y)
-    return setmetatable({ x = x, y = y }, { __eq = function(ca, cb)
-        return ca.x == cb.x and ca.y == cb.y
-    end })
-end
 
 --- @return BlueprintSection
 function BlueprintSection.new()
@@ -104,7 +93,7 @@ function BlueprintSection:width()
             max = test_max
         end
     end
-    local width = math.floor((max or 0) - (min or 0))
+    local width = math.floor((max or 0) - (min or 0) + 0.5)
     return width
 end
 
@@ -201,10 +190,13 @@ function AssemblerNode:generate_crafting_unit()
     local section = BlueprintSection.new()
     local crafting_machine = PlayerInfo.get_crafting_machine_prototype(self.player_index, self.recipe)
     local available_inserters = PlayerInfo.unlocked_inserters(self.player_index)
-    local crafter_width = math.ceil(crafting_machine.selection_box.right_bottom.x - crafting_machine.selection_box.left_top.x)
-    local crafter_height = math.ceil(crafting_machine.selection_box.right_bottom.y - crafting_machine.selection_box.left_top.y)
+    local crafting_machine_size = PrototypeInfo.get_size(crafting_machine)
+    local crafter_width = crafting_machine_size.x
+    local crafter_height = crafting_machine_size.y
     --- ideal crafting speed of the recipe, unit is recipe/second
     local ideal_crafting_speed = crafting_machine.crafting_speed / self.recipe.energy
+
+    print_log("crafter_width = "..tostring(crafter_width) .. ", crafter_height = "..tostring(crafter_height))
 
     section:add({
         -- set top-left corner of crafting machine to 0,0
@@ -242,7 +234,7 @@ function AssemblerNode:generate_crafting_unit()
     --- @field transport_line_y number the connection point's corresponding transport line
     --- @field line_info TransportLineInfo transport line information
 
-    --- @type table<Coordinate, ConnectionSpec> connection entity specification table which is keyed by its coordinate
+    --- @type table<Dimension, ConnectionSpec> connection entity specification table which is keyed by its coordinate
     local connection_positions = setmetatable({}, { __index = function(t, k)
         for test_key, v in pairs(t) do
             if test_key == k then
@@ -255,14 +247,14 @@ function AssemblerNode:generate_crafting_unit()
         -- populate all connection positions
         for _, y in ipairs({ -1, crafter_height }) do
             for x = 0, crafter_width - 1, 1 do
-                connection_positions[Coordinate(x, y)] = {
+                connection_positions[Dimension.new(x, y)] = {
                     replaceable = true
                 }
             end
         end
     end
 
-    --- @type table<'"input"'|'"output"', ArrayList|Coordinate[]> fluid connection point positions of the crafting machine, if available
+    --- @type table<'"input"'|'"output"', ArrayList|Dimension[]> fluid connection point positions of the crafting machine, if available
     local fluid_box_positions = {}
     for _, connection_type in ipairs({ "output", "input" }) do
         fluid_box_positions[connection_type] = toArrayList(crafting_machine.fluid_boxes)
@@ -273,7 +265,7 @@ function AssemblerNode:generate_crafting_unit()
                 end)
                 :map(
                 function(b)
-                    local connection_position = Coordinate(
+                    local connection_position = Dimension.new(
                             b.pipe_connections[1].position[1] + math.floor(crafter_width / 2),
                             b.pipe_connections[1].position[2] + math.floor(crafter_height / 2)
                     )
@@ -502,7 +494,7 @@ function AssemblerNode:generate_crafting_unit()
                             (direction_spec.linearIngredientDirection == defines.direction.east) == (connection_spec.line_info.direction == "input")
                     ) and (crafter_width - 1) or 0
                     spec_table[connection_spec.transport_line_y] = {
-                        position = Coordinate(connection_point_x, connection_spec.transport_line_y),
+                        position = Dimension.new(connection_point_x, connection_spec.transport_line_y),
                         entity = connection_spec.line_info.type == "item" and preferred_belt or game.entity_prototypes["pipe"],
                         ingredients = ArrayList.mapToTable(connection_spec.line_info.crafting_items, function(x)
                             return x.name, 0
