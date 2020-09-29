@@ -15,7 +15,7 @@ function start_unit_tests(player_index)
             end
         end
     end
-    test_transport_line_connector()
+    test_transport_line_connector(player_index)
 end
 
 function insert_test_blueprint(recipe_name, player_index)
@@ -32,21 +32,16 @@ function insert_assembler_node(recipe_name, player_index, recipe_speed)
     PlayerInfo.insert_blueprint(player_index, section.entities)
 end
 
-function test_transport_line_connector()
+function test_transport_line_connector(player_index)
     local surface = game.surfaces[1]
-    function canPlace(position)
-        return surface.can_place_entity("transport-belt", position)
+    local function canPlace(position)
+        assert(position)
+        return surface.can_place_entity { name = "transport-belt", position = position }
     end
-    local surfaceConnector = TransportLineConnector.new(canPlace)
-    local entities = surfaceConnector:buildTransportLine({ name = "transport-belt", position = { x = 0, y = 0 } }, { name = "transport-belt", position = { x = 10, y = 10 } })
-    print_log(serpent.line(ArrayList.map(entities, function(entity)
-        return entity.position
-    end)))
-    for _, entity in ipairs(entities) do
-        surface.create_entity {
-            name = entity.name,
-            position = entity.position,
-            direction = entity.direction
-        }
+    local function place(entity)
+        entity.force = game.players[player_index].force
+        surface.create_entity(entity)
     end
+    local surfaceConnector = TransportLineConnector.new(canPlace, place)
+    surfaceConnector:buildTransportLine({ name = "transport-belt", position = { x = 0, y = 0 } }, { name = "transport-belt", position = { x = 10, y = 10 } })
 end

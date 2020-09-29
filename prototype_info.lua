@@ -139,3 +139,10 @@ function PrototypeInfo.underground_transport_prototype(transport_name)
 
     assert(false, transport_name .. " is neither a transport belt nor a pipe, and hence shall not have a corresponding underground version of it")
 end
+
+function PrototypeInfo.is_underground_transport(name)
+    if game.entity_prototypes[name].max_underground_distance then
+        return true
+    end
+    return false
+end

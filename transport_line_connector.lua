@@ -17,8 +17,9 @@ local FourWayDirections = {
 
 --- @class TransportChain
 --- @field entity LuaEntity
+--- @field entityDistance number
 --- @field prevChain TransportChain
---- @field travelDistance number
+--- @field cumulativeDistance number
 --- @type TransportChain
 local TransportChain = {}
 
@@ -30,7 +31,8 @@ function TransportChain.new(entity, prevChain, travelDistance)
     return setmetatable({
         entity = entity,
         prevChain = prevChain,
-        travelDistance = prevChain and (prevChain.travelDistance + (travelDistance or 1)) or 0
+        cumulativeDistance = prevChain and (prevChain.cumulativeDistance + (travelDistance or 1)) or 0,
+        entityDistance = travelDistance or 1
     }, { __index = TransportChain })
 end
 
@@ -45,26 +47,57 @@ function TransportChain:toEntityList()
     return list
 end
 
+--- @param transportChain TransportChain
+--- @param placeFunc fun(entity: LuaEntityPrototype)
+local function placeAllEntities(transportChain, placeFunc)
+    while transportChain ~= nil do
+        if game.entity_prototypes[transportChain.entity.name].max_underground_distance then
+            transportChain.entity.type = "input"
+            placeFunc(transportChain.entity)
+            -- if the entity is underground line, also place its complement
+            placeFunc {
+                name = transportChain.entity.name,
+                position = Vector2D.fromDirection(transportChain.entity.direction or defines.direction.north):scale(transportChain.entityDistance - 1) + Vector2D.fromPosition(transportChain.entity.position),
+                direction = transportChain.entity.direction,
+                type = "output"
+            }
+        else
+            placeFunc(transportChain.entity)
+        end
+        transportChain = transportChain.prevChain
+    end
+end
+
 --- @class TransportLineConnector
 --- @type TransportLineConnector
 --- @field canPlaceEntityFunc fun(position: Vector2D): boolean
+--- @field placeEntity fun(entity: LuaEntityPrototype)
 local TransportLineConnector = {}
 
 TransportLineConnector.__index = TransportLineConnector
 
 --- @param canPlaceEntityFunc fun(position: Vector2D): boolean
 --- @return TransportLineConnector
-function TransportLineConnector.new(canPlaceEntityFunc)
-    return setmetatable({ canPlaceEntityFunc = function()
-        return true
-    end }, TransportLineConnector)
+function TransportLineConnector.new(canPlaceEntityFunc, placeEntityFunc)
+    assert(canPlaceEntityFunc and placeEntityFunc)
+    return setmetatable(
+            { canPlaceEntityFunc = canPlaceEntityFunc,
+              placeEntityFunc = placeEntityFunc
+            }, TransportLineConnector)
 end
+
+--- @class LineConnectConfig
+--- @field allowUnderground boolean default true
+--- @field preferHorizontal boolean default true
 
 --- @param startingEntity LuaEntity
 --- @param endingEntity LuaEntity
+--- @param additionalConfig LineConnectConfig optional
 --- @return LuaEntity[]
-function TransportLineConnector:buildTransportLine(startingEntity, endingEntity)
+function TransportLineConnector:buildTransportLine(startingEntity, endingEntity, additionalConfig)
     assertAllTruthy(self, startingEntity, endingEntity)
+    local allowUnderground = (additionalConfig ~= nil and additionalConfig.allowUnderground ~= nil) and additionalConfig.allowUnderground or true
+    local preferHorizontal = (additionalConfig ~= nil and additionalConfig.preferHorizontal ~= nil) and additionalConfig.preferHorizontal or true
     local priorityQueue = MinHeap.new()
     -- A* algorithm starts from endingEntity so that we don't have to consider/change last belt's direction
     priorityQueue:push(0, TransportChain.new(endingEntity, nil))
@@ -73,12 +106,13 @@ function TransportLineConnector:buildTransportLine(startingEntity, endingEntity)
         --- @type TransportChain
         local transportChain = priorityQueue:pop().val
         if transportChain.entity.position.x == startingEntity.position.x and transportChain.entity.position.y == startingEntity.position.y then
-            return transportChain:toEntityList()
+            placeAllEntities(transportChain, self.placeEntityFunc)
+            return
         end
-        for entity, travelDistance in pairs(self:surroundingCandidates(transportChain, game.entity_prototypes[startingEntity.name])) do
+        for entity, travelDistance in pairs(self:surroundingCandidates(transportChain, game.entity_prototypes[startingEntity.name], allowUnderground)) do
             assert(entity and travelDistance)
-            local newChain = TransportChain.new(entity, transportChain, travelDistance)
-            priorityQueue:push(self:estimateDistance(entity, startingEntity) + newChain.travelDistance, newChain)
+            local newChain = TransportChain.new(entity, transportChain, travelDistance, travelDistance)
+            priorityQueue:push(self:estimateDistance(entity, startingEntity, preferHorizontal, not preferHorizontal) + newChain.cumulativeDistance, newChain)
         end
         tryNum = tryNum - 1
     end
@@ -87,42 +121,56 @@ function TransportLineConnector:buildTransportLine(startingEntity, endingEntity)
     else
         print_log("Failed to connect transport line within 10000 trials")
     end
-    return {}
+    return
 end
 
 --- @param basePrototype LuaEntityPrototype transport line's base entity prototype
 --- @param transportChain TransportChain
 --- @return table<LuaEntity, number> entity to its travel distance
-function TransportLineConnector:surroundingCandidates(transportChain, basePrototype)
-    assertAllTruthy(self, transportChain, basePrototype)
-    local underground_prototype = PrototypeInfo.underground_transport_prototype(basePrototype.name)
-    local candidates = {}
-    local bannedPos = Vector2D.fromDirection(transportChain.entity.direction or defines.direction.north)
-    for _, direction in ipairs(FourWayDirections) do
-        if direction ~= bannedPos then
-            -- test if we can place it underground
-            for underground_distance = underground_prototype.max_underground_distance, 2, -1 do
-                local newPos = direction:scale(underground_distance) + Vector2D.fromPosition(transportChain.entity.position)
-                if self:canPlace(newPos, transportChain) then
+function TransportLineConnector:surroundingCandidates(transportChain, basePrototype, allowUnderground)
+    assertAllTruthy(self, transportChain, basePrototype, allowUnderground)
+
+    if PrototypeInfo.is_underground_transport(transportChain.entity.name) then
+        local testPos = Vector2D.fromDirection(transportChain.entity.direction or defines.direction.north):reverse() + Vector2D.fromPosition(transportChain.entity.position)
+        if self.canPlaceEntityFunc(testPos) then
+            return { [{
+                name = basePrototype.name,
+                direction = transportChain.entity.direction,
+                position = testPos
+            }] = 1 }
+        end
+    else
+        local underground_prototype = PrototypeInfo.underground_transport_prototype(basePrototype.name)
+        local candidates = {}
+        local bannedPos = Vector2D.fromDirection(transportChain.entity.direction or defines.direction.north)
+        for _, direction in ipairs(FourWayDirections) do
+            if direction ~= bannedPos then
+                -- test if we can place it underground
+                if allowUnderground then
+                    for underground_distance = underground_prototype.max_underground_distance, 2, -1 do
+                        local newPos = direction:scale(underground_distance) + Vector2D.fromPosition(transportChain.entity.position)
+                        if self:canPlace(newPos, transportChain) then
+                            candidates[{
+                                name = underground_prototype.name,
+                                direction = direction:reverse():toDirection(),
+                                position = newPos
+                            }] = underground_distance
+                        end
+                    end
+                end
+                -- test if we can place it on ground
+                local onGroundPos = direction + Vector2D.fromPosition(transportChain.entity.position)
+                if self:canPlace(onGroundPos, transportChain) then
                     candidates[{
-                        name = underground_prototype.name,
+                        name = basePrototype.name,
                         direction = direction:reverse():toDirection(),
-                        position = newPos
-                    }] = underground_distance
+                        position = onGroundPos
+                    }] = 1
                 end
             end
-            -- test if we can place it on ground
-            local onGroundPos = direction + Vector2D.fromPosition(transportChain.entity.position)
-            if self:canPlace(onGroundPos, transportChain) then
-                candidates[{
-                    name = basePrototype.name,
-                    direction = direction:reverse():toDirection(),
-                    position = onGroundPos
-                }] = 1
-            end
         end
+        return candidates
     end
-    return candidates
 end
 
 --- @param position Vector2D
@@ -145,11 +193,11 @@ end
 --- A* algorithm's heuristics cost
 --- @param entity1 LuaEntity
 --- @param entity2 LuaEntity
-function TransportLineConnector:estimateDistance(entity1, entity2)
+function TransportLineConnector:estimateDistance(entity1, entity2, rewardHorizontalFirst, rewardVerticalFirst)
     local dx = math.abs(entity1.position.x - entity2.position.x)
     local dy = math.abs(entity1.position.y - entity2.position.y)
     -- break A* cost tie by rewarding going to same y-level, but reward is no more than 1
-    local reward = 1 / (dy + 2)
+    local reward = (rewardHorizontalFirst and (1 / (dy + 2)) or 0) + (rewardVerticalFirst and (1 / (dx + 2)) or 0)
     return dx + dy - reward
 end
 
