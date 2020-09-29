@@ -7,14 +7,6 @@
 require("util")
 require("minheap")
 
---- @type Vector2D[]
-local FourWayDirections = {
-    Vector2D.fromDirection(defines.direction.north),
-    Vector2D.fromDirection(defines.direction.east),
-    Vector2D.fromDirection(defines.direction.south),
-    Vector2D.fromDirection(defines.direction.west),
-}
-
 --- @class TransportChain
 --- @field entity LuaEntity
 --- @field entityDistance number
@@ -99,13 +91,14 @@ function TransportLineConnector:buildTransportLine(startingEntity, endingEntity,
     local allowUnderground = (additionalConfig ~= nil and additionalConfig.allowUnderground ~= nil) and additionalConfig.allowUnderground or true
     local preferHorizontal = (additionalConfig ~= nil and additionalConfig.preferHorizontal ~= nil) and additionalConfig.preferHorizontal or true
     local priorityQueue = MinHeap.new()
+    local startingEntityTargetPos = Vector2D.fromPosition(startingEntity.position) + Vector2D.fromDirection(startingEntity.direction or defines.direction.north)
     -- A* algorithm starts from endingEntity so that we don't have to consider/change last belt's direction
     priorityQueue:push(0, TransportChain.new(endingEntity, nil))
     local tryNum = 10000
     while not priorityQueue:isEmpty() and tryNum > 0 do
         --- @type TransportChain
         local transportChain = priorityQueue:pop().val
-        if transportChain.entity.position.x == startingEntity.position.x and transportChain.entity.position.y == startingEntity.position.y then
+        if transportChain.entity.position.x == startingEntityTargetPos.x and transportChain.entity.position.y == startingEntityTargetPos.y then
             placeAllEntities(transportChain, self.placeEntityFunc)
             return
         end
@@ -130,47 +123,49 @@ end
 function TransportLineConnector:surroundingCandidates(transportChain, basePrototype, allowUnderground)
     assertAllTruthy(self, transportChain, basePrototype, allowUnderground)
 
+    local underground_prototype = PrototypeInfo.underground_transport_prototype(basePrototype.name)
+    local candidates = {}
+    --- @type table<defines.direction, boolean>
+    local legalDirections
     if PrototypeInfo.is_underground_transport(transportChain.entity.name) then
-        local testPos = Vector2D.fromDirection(transportChain.entity.direction or defines.direction.north):reverse() + Vector2D.fromPosition(transportChain.entity.position)
-        if self.canPlaceEntityFunc(testPos) then
-            return { [{
-                name = basePrototype.name,
-                direction = transportChain.entity.direction,
-                position = testPos
-            }] = 1 }
-        end
+        -- underground belt's input only allows one direction
+        legalDirections = { [Vector2D.fromDirection(transportChain.entity.direction):reverse():toDirection()] = true }
     else
-        local underground_prototype = PrototypeInfo.underground_transport_prototype(basePrototype.name)
-        local candidates = {}
-        local bannedPos = Vector2D.fromDirection(transportChain.entity.direction or defines.direction.north)
-        for _, direction in ipairs(FourWayDirections) do
-            if direction ~= bannedPos then
-                -- test if we can place it underground
-                if allowUnderground then
-                    for underground_distance = underground_prototype.max_underground_distance, 2, -1 do
-                        local newPos = direction:scale(underground_distance) + Vector2D.fromPosition(transportChain.entity.position)
-                        if self:canPlace(newPos, transportChain) then
-                            candidates[{
-                                name = underground_prototype.name,
-                                direction = direction:reverse():toDirection(),
-                                position = newPos
-                            }] = underground_distance
-                        end
-                    end
-                end
-                -- test if we can place it on ground
-                local onGroundPos = direction + Vector2D.fromPosition(transportChain.entity.position)
-                if self:canPlace(onGroundPos, transportChain) then
+        -- normal belt would allow 3 legal directions
+        legalDirections = {
+            [defines.direction.north] = true,
+            [defines.direction.west] = true,
+            [defines.direction.south] = true,
+            [defines.direction.east] = true
+        }
+        legalDirections[transportChain.entity.direction or defines.direction.north] = nil
+    end
+    for direction, _ in pairs(legalDirections) do
+        local directionVector = Vector2D.fromDirection(direction)
+        -- test if we can place it underground
+        if allowUnderground then
+            for underground_distance = underground_prototype.max_underground_distance + 1, 2, -1 do
+                local newPos = directionVector:scale(underground_distance) + Vector2D.fromPosition(transportChain.entity.position)
+                if self:canPlace(newPos, transportChain) then
                     candidates[{
-                        name = basePrototype.name,
-                        direction = direction:reverse():toDirection(),
-                        position = onGroundPos
-                    }] = 1
+                        name = underground_prototype.name,
+                        direction = directionVector:reverse():toDirection(),
+                        position = newPos
+                    }] = underground_distance
                 end
             end
         end
-        return candidates
+        -- test if we can place it on ground
+        local onGroundPos = directionVector + Vector2D.fromPosition(transportChain.entity.position)
+        if self:canPlace(onGroundPos, transportChain) then
+            candidates[{
+                name = basePrototype.name,
+                direction = directionVector:reverse():toDirection(),
+                position = onGroundPos
+            }] = 1
+        end
     end
+    return candidates
 end
 
 --- @param position Vector2D
@@ -198,7 +193,7 @@ function TransportLineConnector:estimateDistance(entity1, entity2, rewardHorizon
     local dy = math.abs(entity1.position.y - entity2.position.y)
     -- break A* cost tie by rewarding going to same y-level, but reward is no more than 1
     local reward = (rewardHorizontalFirst and (1 / (dy + 2)) or 0) + (rewardVerticalFirst and (1 / (dx + 2)) or 0)
-    return dx + dy - reward
+    return (dx + dy - reward) * 2
 end
 
 return TransportLineConnector
