@@ -250,6 +250,10 @@ function Vector2D.new(x, y)
     return setmetatable({ x = x or 0, y = y or 0 }, Vector2D)
 end
 
+function Vector2D.fromPosition(position)
+    return Vector2D.new(position[1] or position.x, position[2] or position.y)
+end
+
 --- @param direction defines.direction
 --- @return Vector2D
 function Vector2D.fromDirection(direction)
@@ -306,6 +310,10 @@ function Vector2D:reverse()
     return Vector2D.new(self.x * -1, self.y * -1)
 end
 
+function Vector2D:scale(magnitude)
+    return Vector2D.new(self.x * magnitude, self.y * magnitude)
+end
+
 --- @return Vector2D
 function Vector2D:__add(other)
     return Vector2D.new(self.x + other.x, self.y + other.y)
@@ -319,7 +327,6 @@ end
 function Vector2D.__eq(ca, cb)
     return ca.x == cb.x and ca.y == cb.y
 end
-
 
 --- @generic T
 --- @param orig T

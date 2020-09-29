@@ -53,6 +53,7 @@ end)
 start_listening_events()
 
 register_global_gui_event_handler(main_button, defines.events.on_gui_click, function(e)
+    start_unit_tests(e.player_index)
     if not gui_root(e.player_index)[main_function_frame] then
         create_main_function_frame(e.player_index)
     else

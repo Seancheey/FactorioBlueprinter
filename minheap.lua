@@ -30,11 +30,15 @@ local function isLessThen(newNum, nodeNum)
 end
 
 
+--- @class MinHeap
+--- @type MinHeap
+MinHeap = {};
+
 --- heapDown
 -- @param arr
 -- @param len
 -- @param idx
-local function heapDown(arr, len, idx)
+function MinHeap:heapDown(arr, len, idx)
     local node = arr[idx];
     local hsize = math.floor(len / 2);
 
@@ -62,9 +66,6 @@ local function heapDown(arr, len, idx)
     node.idx = idx;
     arr[idx] = node;
 end
-
---- class MinHeap
-local MinHeap = {};
 
 
 --- isEmpty
@@ -137,7 +138,7 @@ function MinHeap:del(idx)
             self.len = len;
             arr[idx] = arr[len];
             arr[len] = nil;
-            heapDown(arr, self.len, idx);
+            self:heapDown(arr, self.len, idx);
         end
     end
 
@@ -145,7 +146,7 @@ function MinHeap:del(idx)
 end
 
 --- new
--- @return mheap
+--- @return MinHeap
 function MinHeap.new(lessThanFunc)
     return setmetatable({
         arr = {},
