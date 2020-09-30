@@ -130,6 +130,15 @@ function ArrayList:has(val, eq_func)
     return false
 end
 
+function ArrayList:popRight()
+    local element = self[#self]
+    if not element then
+        return nil
+    end
+    self[#self] = nil
+    return element
+end
+
 --- @param f fun(ele: any):any
 --- @return ArrayList
 function ArrayList:map(f)

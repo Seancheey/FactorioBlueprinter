@@ -6,6 +6,7 @@
 
 require("util")
 require("minheap")
+require("prototype_info")
 
 --- @class TransportChain
 --- @field entity LuaEntity
@@ -129,6 +130,16 @@ end
 --- @param additionalConfig LineConnectConfig optional
 function TransportLineConnector:buildTransportLine(startingEntity, endingEntity, additionalConfig)
     assertAllTruthy(self, startingEntity, endingEntity)
+    startingEntity = {
+        name = startingEntity.name,
+        position = Vector2D.fromPosition(startingEntity.position),
+        direction = startingEntity.direction or defines.direction.north
+    }
+    endingEntity = {
+        name = endingEntity.name,
+        position = Vector2D.fromPosition(endingEntity.position),
+        direction = endingEntity.direction or defines.direction.north
+    }
     local allowUnderground = true
     if additionalConfig and additionalConfig.allowUnderground ~= nil then
         allowUnderground = additionalConfig.allowUnderground
