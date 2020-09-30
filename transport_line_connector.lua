@@ -20,11 +20,12 @@ local TransportChain = {}
 --- @param travelDistance number
 --- @return TransportChain
 function TransportChain.new(entity, prevChain, travelDistance)
+    travelDistance = travelDistance or 1
     return setmetatable({
         entity = entity,
         prevChain = prevChain,
-        cumulativeDistance = prevChain and (prevChain.cumulativeDistance + (travelDistance or 1)) or 0,
-        entityDistance = travelDistance or 1
+        cumulativeDistance = prevChain and (prevChain.cumulativeDistance + travelDistance) or 0,
+        entityDistance = travelDistance
     }, { __index = TransportChain })
 end
 
@@ -37,6 +38,38 @@ function TransportChain:toEntityList()
         currentChain = currentChain.prevChain
     end
     return list
+end
+
+--- @class VectorDict
+--- @type VectorDict
+local VectorDict = {}
+
+function VectorDict.new()
+    return setmetatable({}, { __index = VectorDict })
+end
+
+--- @param vector Vector2D
+function VectorDict:put(vector, val)
+    assertAllTruthy(self, vector, val)
+    if self[vector.x] == nil then
+        self[vector.x] = {}
+    end
+    self[vector.x][vector.y] = val
+end
+
+function VectorDict:get(vector)
+    if self[vector.x] == nil then
+        return nil
+    end
+    return self[vector.x][vector.y]
+end
+
+function VectorDict:forEach(f)
+    for x, ys in pairs(self) do
+        for y, val in pairs(ys) do
+            f(Vector2D.new(x, y), val)
+        end
+    end
 end
 
 --- @param transportChain TransportChain
@@ -60,10 +93,19 @@ local function placeAllEntities(transportChain, placeFunc)
     end
 end
 
+local function debug_visited_position(connector, visitedPositions)
+    visitedPositions:forEach(
+            function(vector)
+                if connector.canPlaceEntityFunc(vector) then
+                    connector.placeEntityFunc({ name = "small-lamp", position = vector })
+                end
+            end)
+end
+
 --- @class TransportLineConnector
 --- @type TransportLineConnector
 --- @field canPlaceEntityFunc fun(position: Vector2D): boolean
---- @field placeEntity fun(entity: LuaEntityPrototype)
+--- @field placeEntityFunc fun(entity: LuaEntityPrototype)
 local TransportLineConnector = {}
 
 TransportLineConnector.__index = TransportLineConnector
@@ -85,34 +127,44 @@ end
 --- @param startingEntity LuaEntity
 --- @param endingEntity LuaEntity
 --- @param additionalConfig LineConnectConfig optional
---- @return LuaEntity[]
 function TransportLineConnector:buildTransportLine(startingEntity, endingEntity, additionalConfig)
     assertAllTruthy(self, startingEntity, endingEntity)
-    local allowUnderground = (additionalConfig ~= nil and additionalConfig.allowUnderground ~= nil) and additionalConfig.allowUnderground or true
-    local preferHorizontal = (additionalConfig ~= nil and additionalConfig.preferHorizontal ~= nil) and additionalConfig.preferHorizontal or true
+    local allowUnderground = true
+    if additionalConfig and additionalConfig.allowUnderground ~= nil then
+        allowUnderground = additionalConfig.allowUnderground
+    end
+    local preferHorizontal = (additionalConfig and (additionalConfig.preferHorizontal ~= nil)) and additionalConfig.preferHorizontal or true
+    local visitedPositions = VectorDict.new()
     local priorityQueue = MinHeap.new()
     local startingEntityTargetPos = Vector2D.fromPosition(startingEntity.position) + Vector2D.fromDirection(startingEntity.direction or defines.direction.north)
+    if not self.canPlaceEntityFunc(startingEntityTargetPos) then
+        print_log("starting entity's target position is blocked")
+        return
+    end
     -- A* algorithm starts from endingEntity so that we don't have to consider/change last belt's direction
     priorityQueue:push(0, TransportChain.new(endingEntity, nil))
-    local tryNum = 10000
-    while not priorityQueue:isEmpty() and tryNum > 0 do
+    local maxTryNum = 1000000
+    local tryNum = 0
+    while not priorityQueue:isEmpty() and tryNum < maxTryNum do
         --- @type TransportChain
         local transportChain = priorityQueue:pop().val
         if transportChain.entity.position.x == startingEntityTargetPos.x and transportChain.entity.position.y == startingEntityTargetPos.y then
             placeAllEntities(transportChain, self.placeEntityFunc)
+            print_log("Algorithm spent " .. tostring(tryNum) .. " number of tries to find solution")
             return
         end
-        for entity, travelDistance in pairs(self:surroundingCandidates(transportChain, game.entity_prototypes[startingEntity.name], allowUnderground)) do
+        for entity, travelDistance in pairs(self:surroundingCandidates(transportChain, visitedPositions, game.entity_prototypes[startingEntity.name], allowUnderground)) do
             assert(entity and travelDistance)
-            local newChain = TransportChain.new(entity, transportChain, travelDistance, travelDistance)
-            priorityQueue:push(self:estimateDistance(entity, startingEntity, preferHorizontal, not preferHorizontal) + newChain.cumulativeDistance, newChain)
+            local newChain = TransportChain.new(entity, transportChain, travelDistance)
+            priorityQueue:push(self:estimateDistance(entity.position, startingEntityTargetPos, preferHorizontal, not preferHorizontal) + newChain.cumulativeDistance, newChain)
+            visitedPositions:put(transportChain.entity.position, newChain.cumulativeDistance)
         end
-        tryNum = tryNum - 1
+        tryNum = tryNum + 1
     end
     if priorityQueue:isEmpty() then
         print_log("finding terminated early since there is no more places to find")
     else
-        print_log("Failed to connect transport line within 10000 trials")
+        print_log("Failed to connect transport line within " .. tostring(maxTryNum) .. " trials")
     end
     return
 end
@@ -120,10 +172,11 @@ end
 --- @param basePrototype LuaEntityPrototype transport line's base entity prototype
 --- @param transportChain TransportChain
 --- @return table<LuaEntity, number> entity to its travel distance
-function TransportLineConnector:surroundingCandidates(transportChain, basePrototype, allowUnderground)
+function TransportLineConnector:surroundingCandidates(transportChain, visitedPositions, basePrototype, allowUnderground)
     assertAllTruthy(self, transportChain, basePrototype, allowUnderground)
 
     local underground_prototype = PrototypeInfo.underground_transport_prototype(basePrototype.name)
+    --- @type table<LuaEntity, number>
     local candidates = {}
     --- @type table<defines.direction, boolean>
     local legalDirections
@@ -146,7 +199,7 @@ function TransportLineConnector:surroundingCandidates(transportChain, baseProtot
         if allowUnderground then
             for underground_distance = underground_prototype.max_underground_distance + 1, 2, -1 do
                 local newPos = directionVector:scale(underground_distance) + Vector2D.fromPosition(transportChain.entity.position)
-                if self:canPlace(newPos, transportChain) then
+                if self:canPlace(newPos, transportChain.cumulativeDistance + underground_distance, visitedPositions, transportChain.entity.position) then
                     candidates[{
                         name = underground_prototype.name,
                         direction = directionVector:reverse():toDirection(),
@@ -157,7 +210,7 @@ function TransportLineConnector:surroundingCandidates(transportChain, baseProtot
         end
         -- test if we can place it on ground
         local onGroundPos = directionVector + Vector2D.fromPosition(transportChain.entity.position)
-        if self:canPlace(onGroundPos, transportChain) then
+        if self:canPlace(onGroundPos, transportChain.cumulativeDistance + 1, visitedPositions, transportChain.entity.position) then
             candidates[{
                 name = basePrototype.name,
                 direction = directionVector:reverse():toDirection(),
@@ -165,22 +218,24 @@ function TransportLineConnector:surroundingCandidates(transportChain, baseProtot
             }] = 1
         end
     end
+    local candidates_string = ""
+    for candidate, _ in pairs(candidates) do
+        candidates_string = candidates_string .. serpent.line(candidate.position) .. ", "
+    end
+    print_log("belt " .. serpent.line(transportChain.entity.position) .. "'s candidates = " .. candidates_string)
     return candidates
 end
 
 --- @param position Vector2D
---- @param transportChain TransportChain
-function TransportLineConnector:canPlace(position, transportChain)
-    assertAllTruthy(self, position, transportChain)
-
-    if not self.canPlaceEntityFunc(position) then
+--- @param visitedPositions VectorDict
+function TransportLineConnector:canPlace(position, cumulativeDistance, visitedPositions, targetPos)
+    assertAllTruthy(self, position, visitedPositions)
+    local currentMinDistance = visitedPositions:get(targetPos)
+    if currentMinDistance and currentMinDistance <= cumulativeDistance then
         return false
     end
-    while transportChain ~= nil do
-        if transportChain.entity.position.x == position.x and transportChain.entity.position.y == position.y then
-            return false
-        end
-        transportChain = transportChain.prevChain
+    if not self.canPlaceEntityFunc(position) then
+        return false
     end
     return true
 end
@@ -188,12 +243,13 @@ end
 --- A* algorithm's heuristics cost
 --- @param entity1 LuaEntity
 --- @param entity2 LuaEntity
-function TransportLineConnector:estimateDistance(entity1, entity2, rewardHorizontalFirst, rewardVerticalFirst)
-    local dx = math.abs(entity1.position.x - entity2.position.x)
-    local dy = math.abs(entity1.position.y - entity2.position.y)
+function TransportLineConnector:estimateDistance(position1, position2, rewardHorizontalFirst, rewardVerticalFirst)
+    local dx = math.abs(position1.x - position2.x)
+    local dy = math.abs(position1.y - position2.y)
     -- break A* cost tie by rewarding going to same y-level, but reward is no more than 1
     local reward = (rewardHorizontalFirst and (1 / (dy + 2)) or 0) + (rewardVerticalFirst and (1 / (dx + 2)) or 0)
-    return (dx + dy - reward) * 2
+    print_log("reward = " .. tostring(reward))
+    return (dx + dy - reward) * 1.5
 end
 
 return TransportLineConnector
