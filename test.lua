@@ -2,8 +2,6 @@ local test_all = true
 
 require("gui.gui")
 
-local TransportLineConnector = require("transport_line_connector")
-
 local testing_recipes = { "copper-plate", "transport-belt", "steel-chest", "advanced-oil-processing", "coal-liquefaction", "explosives" }
 local testing_speed = { 0.01, 1, 50 }
 
@@ -15,7 +13,6 @@ function start_unit_tests(player_index)
             end
         end
     end
-    test_transport_line_connector(player_index)
 end
 
 function insert_test_blueprint(recipe_name, player_index)
@@ -32,16 +29,3 @@ function insert_assembler_node(recipe_name, player_index, recipe_speed)
     PlayerInfo.insert_blueprint(player_index, section.entities)
 end
 
-function test_transport_line_connector(player_index)
-    local surface = game.surfaces[1]
-    local function canPlace(position)
-        assert(position)
-        return surface.can_place_entity { name = "transport-belt", position = position }
-    end
-    local function place(entity)
-        entity.force = game.players[player_index].force
-        surface.create_entity(entity)
-    end
-    local surfaceConnector = TransportLineConnector.new(canPlace, place)
-    surfaceConnector:buildTransportLine({ name = "transport-belt", position = { x = 0, y = 0 } }, { name = "transport-belt", position = { x = 10, y = 10 } })
-end
