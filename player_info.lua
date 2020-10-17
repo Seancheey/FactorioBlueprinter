@@ -1,4 +1,4 @@
-PlayerInfo = {}
+local PlayerInfo = {}
 PlayerInfo.__index = PlayerInfo
 
 --- @class PlayerSetting
@@ -215,3 +215,5 @@ function PlayerInfo.insert_blueprint(player_index, entities)
         end
     end
 end
+
+return PlayerInfo

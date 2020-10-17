@@ -1,6 +1,6 @@
 require("util")
 require("prototype_info")
-require("player_info")
+local PlayerInfo = require("player_info")
 
 --- @alias recipe_name string
 --- @alias ingredient_name string

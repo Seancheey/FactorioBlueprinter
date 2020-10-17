@@ -5,6 +5,7 @@ require("gui.outputs_select_frame")
 require("gui.inputs_select_frame")
 require("blueprint_gen")
 require("test")
+local PlayerInfo = require("player_info")
 
 --- @alias player_index number
 

@@ -1,3 +1,5 @@
+local PlayerInfo = require("player_info")
+
 --- add a new output item selection box for player with *player_index* at *parent* gui element
 --- @param parent LuaGuiElement
 local function add_output_item_selection_box(player_index, parent, outputs_specifications)

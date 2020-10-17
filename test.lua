@@ -1,6 +1,5 @@
-local test_all = true
-
 require("gui.gui")
+local PlayerInfo = require("player_info")
 
 local testing_recipes = { "copper-plate", "transport-belt", "steel-chest", "advanced-oil-processing", "coal-liquefaction", "explosives" }
 local testing_speed = { 0.01, 1, 50 }
