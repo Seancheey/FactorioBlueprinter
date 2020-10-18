@@ -1,4 +1,6 @@
 local PlayerInfo = require("player_info")
+--- @type AssemblerNode
+local AssemblerNode = require("blueprint_gen.assembler_node")
 
 --- add a new output item selection box for player with *player_index* at *parent* gui element
 --- @param parent LuaGuiElement

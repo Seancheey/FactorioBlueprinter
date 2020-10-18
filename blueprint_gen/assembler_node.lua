@@ -1,208 +1,16 @@
-require("util")
 require("prototype_info")
+--- @type Logger
+local logging = require("__MiscLib__/logging")
+--- @type ArrayList
+local ArrayList = require("__MiscLib__/array_list")
+--- @type Vector2D
+local Vector2D = require("__MiscLib__/vector2d")
 local PlayerInfo = require("player_info")
-
---- @alias recipe_name string
---- @alias ingredient_name string
-
---- @class Entity
---- @field entity_number number unique identifier of entity
---- @field name string entity name
---- @field position Vector2D
---- @field direction any defines.direction.east/south/west/north
-
---- @class ConnectionPoint
---- @field ingredients table<ingredient_name, number> ingredients that the connection point is transporting to number of items transported per second
---- @field position Vector2D
---- @field connection_entity LuaEntityPrototype
-
---- @class BlueprintSection
---- @field entities Entity[]
---- @field inlets ConnectionPoint[]
---- @field outlets ConnectionPoint[]
-
+local PrototypeInfo = require("prototype_info")
+local BlueprintGeneratorUtil = require("blueprint_gen.util")
+local average_amount_of = BlueprintGeneratorUtil.average_amount_of
 --- @type BlueprintSection
-BlueprintSection = {}
-BlueprintSection.__index = BlueprintSection
-
---- @return BlueprintSection
-function BlueprintSection.new()
-    --- @type BlueprintSection
-    o = { entities = toArrayList {}, inlets = toArrayList {}, outlets = toArrayList {} }
-    setmetatable(o, BlueprintSection)
-    return o
-end
-
-function BlueprintSection:copy(xoff, yoff)
-    assert(self)
-    xoff = xoff or 0
-    yoff = yoff or 0
-    --- @param old Entity
-    function shift_func(old)
-        local new = deep_copy(old)
-        new.position.x = new.position.x + xoff
-        new.position.y = new.position.y + yoff
-        return new
-    end
-    local new_section = BlueprintSection.new()
-    new_section.entities = toArrayList(self.entities):map(shift_func)
-    new_section.inlets = toArrayList(self.inlets):map(shift_func)
-    new_section.outlets = toArrayList(self.outlets):map(shift_func)
-    return new_section
-end
-
---- @param entity Entity
-function BlueprintSection:add(entity)
-    assertAllTruthy(self, entity)
-    entity.entity_number = #self.entities + 1
-    self.entities[entity.entity_number] = entity
-end
-
---- @param section BlueprintSection
-function BlueprintSection:addSection(section)
-    assertAllTruthy(self, section)
-
-    for _, entity in ipairs(section.entities) do
-        self:add(deep_copy(entity))
-    end
-    for _, inlet in ipairs(section.inlets) do
-        self.inlets:add(deep_copy(inlet))
-    end
-    for _, outlet in ipairs(section.outlets) do
-        self.inlets:add(deep_copy(outlet))
-    end
-end
-
---- concatenate with another section, assuming that self's outlets and other's inlets are connected.
---- If no offsets are provided, default to concatenate other to right side.
---- @param other BlueprintSection
---- @param xoff number optional, x-offset of the other section, default to width of self
---- @return BlueprintSection new self
-function BlueprintSection:concat(other, xoff)
-    assertAllTruthy(self, other)
-    xoff = xoff or self:width()
-
-    self.outlets = {}
-    for _, entity in ipairs(other.entities) do
-        local new_entity = deep_copy(entity)
-        new_entity.position.x = new_entity.position.x + xoff
-        self:add(new_entity)
-    end
-
-    local outlet_increase = other:width()
-    for _, outlet in ipairs(self.outlets) do
-        outlet.position.x = outlet.position.x + outlet_increase
-    end
-
-    return self
-end
-
-function BlueprintSection:width()
-    local min, max
-    for _, entity in ipairs(self.entities) do
-        test_min = entity.position.x + game.entity_prototypes[entity.name].selection_box.left_top.x
-        if not min or test_min < min then
-            min = test_min
-        end
-        test_max = entity.position.x + game.entity_prototypes[entity.name].selection_box.right_bottom.x
-        if not max or test_max > max then
-            max = test_max
-        end
-    end
-    local width = math.floor((max or 0) - (min or 0) + 0.5)
-    return width
-end
-
-function BlueprintSection:height()
-    local min, max
-    for _, entity in ipairs(self.entities) do
-        test_min = entity.position.y + game.entity_prototypes[entity.name].selection_box.left_top.y
-        if not min or test_min < min then
-            min = test_min
-        end
-        test_max = entity.position.y + game.entity_prototypes[entity.name].selection_box.right_bottom.y
-        if not max or test_max > max then
-            max = test_max
-        end
-    end
-    local height = math.floor((max or 0) - (min or 0) + 0.5)
-    return height
-end
-
-function BlueprintSection:shift(x_off, y_off)
-    for _, entity in ipairs(self.entities) do
-        entity.position.x = entity.position.x + x_off
-        entity.position.y = entity.position.y + y_off
-    end
-    for _, inlet in ipairs(self.inlets) do
-        inlet.position.x = inlet.position.x + x_off
-        inlet.position.y = inlet.position.y + y_off
-    end
-    for _, outlet in ipairs(self.outlets) do
-        outlet.position.x = outlet.position.x + x_off
-        outlet.position.y = outlet.position.y + y_off
-    end
-end
-
---- clear overlapped units, last-in entity get saved
-function BlueprintSection:clear_overlap()
-    local position_dict = {}
-    for _, entity in ipairs(self.entities) do
-        local pos = tostring(entity.position[1] or entity.position.x) .. "," .. tostring(entity.position[2] or entity.position.y)
-        position_dict[pos] = entity
-    end
-    self.entities = {}
-    for _, entity in pairs(position_dict) do
-        self:add(entity)
-    end
-end
-
---- @param n_times number
---- @return BlueprintSection
-function BlueprintSection:repeat_self(n_times)
-    assertAllTruthy(self, n_times)
-
-    local unit = self:copy()
-    local unit_width = unit:width()
-    print_log(serpent.line(unit.entities, { maxlevel = 4 }))
-
-    for i = 1, n_times - 1, 1 do
-        self:concat(unit, unit_width * i, 0)
-    end
-    return self
-end
-
--- rotate clockwise 90*n degrees
-function BlueprintSection:rotate(n)
-    local rotate_matrices = { [0] = function(x, y)
-        return { x = x, y = y }
-    end, [1] = function(x, y)
-        return { x = y, y = -x }
-    end, [2] = function(x, y)
-        return { x = -x, y = -y }
-    end, [3] = function(x, y)
-        return { x = -y, y = x }
-    end }
-
-    n = -n % 4
-    local rotate_func = rotate_matrices[n]
-    for _, entity in ipairs(self.entities) do
-        local prototype = game.entity_prototypes[entity.name]
-        -- entity with even number of width/height will have a small centering offset
-        local x_offset = (math.ceil(prototype.selection_box.right_bottom.x - prototype.selection_box.left_top.x + 1) % 2) / 2
-        local y_offset = (math.ceil(prototype.selection_box.right_bottom.y - prototype.selection_box.left_top.y + 1) % 2) / 2
-        if entity.name == "stone-furnace" then
-            print_log("before position: " .. serpent.line(entity.position))
-        end
-        entity.position = rotate_func(entity.position.x - x_offset, entity.position.y - y_offset)
-        if entity.name == "stone-furnace" then
-            print_log("after position: " .. serpent.line(entity.position))
-        end
-        entity.direction = ((entity.direction or 0) - 2 * n) % 8
-    end
-end
-
-ALL_BELTS = { "transport-belt", "fast-transport-belt", "express-transport-belt" }
+local BlueprintSection = require("blueprint_gen.blueprint_section")
 
 --- @class AssemblerNode represent a group of crafting machines for crafting a single recipe
 --- @field recipe LuaRecipePrototype
@@ -211,7 +19,7 @@ ALL_BELTS = { "transport-belt", "fast-transport-belt", "express-transport-belt" 
 --- @field sources table<ingredient_name, AssemblerNode> assemblers that inputs are received from
 --- @field player_index player_index
 --- @type AssemblerNode
-AssemblerNode = {}
+local AssemblerNode = {}
 
 -- AssemblerNode class inherent Table class
 function AssemblerNode.__index (t, k)
@@ -225,8 +33,8 @@ end
 function AssemblerNode.new(o)
     assert(o.recipe and o.player_index)
     o.recipe_speed = o.recipe_speed or 0
-    o.targets = o.targets or toArrayList {}
-    o.sources = o.sources or toArrayList {}
+    o.targets = o.targets or ArrayList.new {}
+    o.sources = o.sources or ArrayList.new {}
     setmetatable(o, AssemblerNode)
     return o
 end
@@ -243,7 +51,7 @@ function AssemblerNode:generate_crafting_unit()
     --- ideal crafting speed of the recipe, unit is recipe/second
     local ideal_crafting_speed = crafting_machine.crafting_speed / self.recipe.energy
 
-    print_log("crafter_width = " .. tostring(crafter_width) .. ", crafter_height = " .. tostring(crafter_height))
+    logging.log("crafter_width = " .. tostring(crafter_width) .. ", crafter_height = " .. tostring(crafter_height))
 
     section:add({
         -- set top-left corner of crafting machine to 0,0
@@ -304,13 +112,13 @@ function AssemblerNode:generate_crafting_unit()
     --- @type table<'"input"'|'"output"', ArrayList|Vector2D[]> fluid connection point positions of the crafting machine, if available
     local fluid_box_positions = {}
     for _, connection_type in ipairs({ "output", "input" }) do
-        fluid_box_positions[connection_type] = toArrayList(crafting_machine.fluid_boxes)
-                :filter(
+        fluid_box_positions[connection_type] = ArrayList.new(crafting_machine.fluid_boxes)
+                                                        :filter(
                 function(box)
                     local out = type(box) == "table" and box.production_type == connection_type
                     return out
                 end)
-                :map(
+                                                        :map(
                 function(b)
                     local connection_position = Vector2D.new(
                             b.pipe_connections[1].position[1] + math.floor(crafter_width / 2),
@@ -331,7 +139,7 @@ function AssemblerNode:generate_crafting_unit()
 
     --- @param recipe LuaRecipePrototype
     --- @return TransportLineInfo[] | ArrayList
-    function create_transport_line_info_list(recipe)
+    local function create_transport_line_info_list(recipe)
         --- @type TransportLineInfo[]|ArrayList
         local item_info_list = ArrayList.new()
         --- @type TransportLineInfo[]|ArrayList
@@ -390,8 +198,8 @@ function AssemblerNode:generate_crafting_unit()
                 local corresponding_fluid_box_position = fluid_box_positions[line_info.direction][fluid_box_indices[line_info.direction]]
                 -- pre-check for any crafting machine prototypes with unknown fluid box support
                 if line_info.type == "fluid" and corresponding_fluid_box_position == nil then
-                    print_log("This mod recipe's crafting machine needs fluid box connection, which is not supported by the mod yet. Consider prioritize a built-in crafting machine instead? Failed to make blueprint :(", logging.E)
-                    print_log("You can add support for this recipe by contributing it's fluid box connections in github: https://github.com/Seancheey/FactorioBlueprinter/blob/master/prototype_info.lua")
+                    logging.log("This mod recipe's crafting machine needs fluid box connection, which is not supported by the mod yet. Consider prioritize a built-in crafting machine instead? Failed to make blueprint :(", logging.E)
+                    logging.log("You can add support for this recipe by contributing it's fluid box connections in github: https://github.com/Seancheey/FactorioBlueprinter/blob/master/prototype_info.lua")
                     return
                 end
                 if line_info.type == "fluid" and
@@ -487,7 +295,7 @@ function AssemblerNode:generate_crafting_unit()
                                 local fastest_inserter = inserter_order[#inserter_order]
                                 inserter_type = fastest_inserter.name
                                 inserter_num_need = math.ceil(required_rotation_per_sec / PlayerInfo.inserter_items_speed(self.player_index, fastest_inserter))
-                                print_log(serpent.line(line_info.crafting_items) .. " requires " .. tostring(inserter_num_need) .. " " .. fastest_inserter.name)
+                                logging.log(serpent.line(line_info.crafting_items) .. " requires " .. tostring(inserter_num_need) .. " " .. fastest_inserter.name)
                             end
                         else
                             if transport_line_distance == 1 then
@@ -527,7 +335,7 @@ function AssemblerNode:generate_crafting_unit()
         --- @type table<number, ConnectionPoint>
         local outlet_line_spec = {}
         for coordinate, connection_spec in pairs(connection_positions) do
-            -- print_log("coordinate: " .. serpent.line(coordinate) .. " connection spec: " .. serpent.line(connection_spec))
+            -- logging.log("coordinate: " .. serpent.line(coordinate) .. " connection spec: " .. serpent.line(connection_spec))
             if connection_spec.entity then
                 section:add({
                     name = connection_spec.entity.name,
@@ -563,7 +371,7 @@ function AssemblerNode:generate_crafting_unit()
                     for item_name, amount in pairs(crafting_item_recipe_nums) do
                         crafting_item_ratios[item_name] = amount / total_amount
                     end
-                    print_log("crafting_item_ratios = " .. serpent.line(crafting_item_ratios))
+                    logging.log("crafting_item_ratios = " .. serpent.line(crafting_item_ratios))
                 end
 
                 for _, crafting_item in ipairs(connection_spec.line_info.crafting_items) do
@@ -585,7 +393,7 @@ function AssemblerNode:generate_crafting_unit()
             local belt_lane_num = #ArrayList.new(connection_point.ingredients)
             for _, speed in pairs(connection_point.ingredients) do
                 local max_belt_speed = preferred_belt.belt_speed * 480 / belt_lane_num
-                print_log("max belt speed " .. tostring(preferred_belt.belt_speed * 480))
+                logging.log("max belt speed " .. tostring(preferred_belt.belt_speed * 480))
                 local repetition = math.ceil(max_belt_speed / speed)
                 if repetition < max_speed_unit_repetition_num then
                     max_speed_unit_repetition_num = repetition
@@ -596,7 +404,7 @@ function AssemblerNode:generate_crafting_unit()
             end
         end
     end
-    --print_log("inlets = " .. serpent.line(section.inlets) .. ",\n outlets = " .. serpent.line(section.outlets).. "\n ---")
+    --logging.log("inlets = " .. serpent.line(section.inlets) .. ",\n outlets = " .. serpent.line(section.outlets).. "\n ---")
     return section, max_speed_unit_repetition_num, direction_spec, max_recipe_speed
 end
 
@@ -621,190 +429,4 @@ function AssemblerNode:generate_section()
     return section
 end
 
---- @class BlueprintGraph
---- @field inputs table<ingredient_name, AssemblerNode> input ingredients
---- @field outputs table<ingredient_name, AssemblerNode> output ingredients
---- @field dict table<recipe_name, AssemblerNode> all assembler nodes
---- @field player_index player_index
-BlueprintGraph = {}
-function BlueprintGraph.__index(t, k)
-    return BlueprintGraph[k] or ArrayList[k] or t.dict[k]
-end
-
---- @return BlueprintGraph
-function BlueprintGraph.new(player_index)
-    o = { player_index = player_index }
-    o.inputs = toArrayList {}
-    o.outputs = toArrayList {}
-    o.dict = toArrayList {}
-    setmetatable(o, BlueprintGraph)
-    return o
-end
-
---- @param output_specs OutputSpec[]
-function BlueprintGraph:generate_graph_by_outputs(output_specs)
-    assertAllTruthy(self, output_specs)
-
-    for _, requirement in ipairs(output_specs) do
-        if requirement.ingredient and requirement.crafting_speed then
-            self:__generate_assembler(requirement.ingredient, requirement.crafting_speed, true)
-        end
-    end
-end
-
-function BlueprintGraph:use_products_as_input(item_name)
-    self.__index = BlueprintGraph.__index
-    setmetatable(self, self)
-    local nodes = self:__assemblers_whose_ingredients_have(item_name)
-    if nodes:any(function(x)
-        return self.outputs:has(x)
-    end) then
-        print_log("ingredient can't be more advanced", logging.I)
-        return
-    end
-
-    self.inputs[item_name] = nil
-    for _, node in pairs(nodes) do
-        for _, product in ipairs(node.recipe.products) do
-            for _, target in pairs(self:__assemblers_whose_ingredients_have(product.name)) do
-                self.inputs[product.name] = target
-            end
-        end
-    end
-
-    -- remove unnecessary input sources that are fully covered by other sources
-    local others = shallow_copy(self.inputs)
-    local to_remove = {}
-    for input_name, input_node in pairs(self.inputs) do
-        others[input_name] = nil
-        if self:__ingredient_fully_used_by(input_name, ArrayList.fromKeys(others)) then
-            to_remove[input_name] = input_node
-        end
-        others[input_name] = input_node
-    end
-    for input_name, _ in pairs(to_remove) do
-        self.inputs[input_name] = nil
-    end
-end
-
-function BlueprintGraph:use_ingredients_as_input(item_name)
-    self.__index = BlueprintGraph.__index
-    setmetatable(self, self)
-    local viable = false
-    for _, node in pairs(self:__assemblers_whose_products_have(item_name)) do
-        for _, ingredient in pairs(node.recipe.ingredients) do
-            self.inputs[ingredient.name] = node
-            viable = true
-        end
-    end
-    if viable then
-        self.inputs[item_name] = nil
-    end
-end
-
---- insert a new blueprint item into player's inventory
-function BlueprintGraph:generate_blueprint()
-    -- TODO use full blueprint rather then first output
-    for _, output_node in pairs(self.outputs) do
-        PlayerInfo.insert_blueprint(self.player_index, output_node:generate_section().entities)
-        break
-    end
-end
-
-function BlueprintGraph:__generate_assembler(recipe_name, crafting_speed, is_final)
-    assert(self and recipe_name and crafting_speed and (is_final ~= nil))
-    local recipe = game.recipe_prototypes[recipe_name]
-    if recipe then
-        -- setup current node
-        self.dict[recipe_name] = self.dict[recipe_name] or AssemblerNode.new { recipe = recipe, player_index = self.player_index }
-        local node = self.dict[recipe_name]
-        if is_final then
-            for _, product in ipairs(node.products) do
-                print_log("output:" .. product.name)
-                self.outputs[product.name] = node
-            end
-        end
-        local new_speed
-        for _, product in ipairs(node.recipe.products) do
-            if product.name == recipe_name then
-                new_speed = crafting_speed / average_amount_of(product)
-                node.recipe_speed = node.recipe_speed + new_speed
-                break
-            end
-        end
-        if new_speed == nil then
-            print_log("speed setup for " .. recipe_name .. " failed", logging.E)
-            new_speed = 1
-        end
-        -- setup children nodes
-        for _, ingredient in ipairs(node.ingredients) do
-            child_recipe = game.recipe_prototypes[ingredient.name]
-            if child_recipe then
-                local child = self:__generate_assembler(child_recipe.name, ingredient.amount * new_speed, false)
-                node.sources[ingredient.name] = child
-                child.targets[recipe_name] = node
-            else
-                self.inputs[ingredient.name] = node
-            end
-        end
-        return node
-    else
-        print_log(recipe_name .. " doesn't have a recipe.", logging.E)
-    end
-end
-
---- @return AssemblerNode[]
-function BlueprintGraph:__assemblers_whose_products_have(item_name)
-    if self[item_name] then
-        return toArrayList { self[item_name] }
-    end
-    local out = toArrayList {}
-    for _, node in pairs(self.dict) do
-        for _, product in pairs(node.recipe.products) do
-            if product.name == item then
-                out[#out + 1] = node
-                break
-            end
-        end
-    end
-    return out
-end
-
---- @return AssemblerNode[]
-function BlueprintGraph:__assemblers_whose_ingredients_have(item_name)
-    assert(self and item_name)
-    local out = toArrayList {}
-    if self[item_name] then
-        for _, node in pairs(self[item_name].targets) do
-            out[#out + 1] = node
-        end
-        return out
-    end
-    for _, node in pairs(self.dict) do
-        for _, ingredient in ipairs(node.recipe.ingredients) do
-            if ingredient.name == item_name then
-                out[#out + 1] = node
-                break
-            end
-        end
-    end
-    return out
-end
-
-function BlueprintGraph:__ingredient_fully_used_by(ingredient_name, item_list)
-    if self.outputs[ingredient_name] then
-        return false
-    end
-    if item_list:has(ingredient_name) then
-        return true
-    end
-    products = toArrayList {}
-    for _, node in ipairs(self:__assemblers_whose_ingredients_have(ingredient_name)) do
-        for _, p in ipairs(node.recipe.products) do
-            products[#products + 1] = p.name
-        end
-    end
-    return products:all(function(p)
-        return self:__ingredient_fully_used_by(p, item_list)
-    end)
-end
+return AssemblerNode

@@ -1,6 +1,6 @@
 require("util")
 
-guilib_listening_events = {
+local guilib_listening_events = {
     defines.events.on_gui_click,
     defines.events.on_gui_opened,
     defines.events.on_gui_elem_changed,
@@ -10,10 +10,10 @@ guilib_listening_events = {
 }
 
 -- gui_handlers[player_index][event][gui_path] = handler
-gui_handlers = {}
+local gui_handlers = {}
 
 -- global_gui_handlers[event][gui_path] = handler
-global_gui_handlers = {}
+local global_gui_handlers = {}
 
 local gui_root_name = "left"
 
@@ -66,7 +66,7 @@ end
 --- @param player_index number
 --- @param gui_elem LuaGuiElement
 --- @param event defines.events
---- @param handler function(e)
+--- @param handler fun(e)
 function register_gui_event_handler(player_index, gui_elem, event, handler)
     assertAllTruthy(player_index, gui_elem, event, handler)
     assert(type(handler) == "function", "handler should be a function")
@@ -74,7 +74,7 @@ function register_gui_event_handler(player_index, gui_elem, event, handler)
 
     __init_guilib_player_handler(player_index)
 
-    gui_path = path_of(gui_elem)
+    local gui_path = path_of(gui_elem)
     for _, elem_name in pairs(__split_path(gui_path)) do
         assert(elem_name ~= "", "there is an element in path of " .. gui_elem.name .. "without name")
     end

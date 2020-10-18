@@ -74,6 +74,10 @@ local prototype_addition = {
     -- Below is prototypes of mods, add your mod fluid box prototype here
 }
 
+-- TODO:  remove this field and replace it with automatic inferred belts
+ALL_BELTS = { "transport-belt", "fast-transport-belt", "express-transport-belt" }
+
+
 --- fields that allows prototype.field == nil to exist.
 local nullable_fields = toArrayList({ "fluid_boxes" })
 
@@ -98,14 +102,8 @@ function get_entity_prototype(name)
     })
 end
 
---- @param crafting_item Product|Ingredient
---- @return number average amount
-function average_amount_of(crafting_item)
-    assert(crafting_item.amount or crafting_item.amount_max, serpent.line(crafting_item) .. "has no amount or amount_max field")
-    return crafting_item.amount or ((crafting_item.amount_max + crafting_item.amount_min) / 2)
-end
 
-PrototypeInfo = {}
+local PrototypeInfo = {}
 --- @param prototype LuaEntityPrototype
 --- @return Vector2D
 function PrototypeInfo.get_size(prototype)
@@ -159,3 +157,5 @@ function sprite_of(name)
         print_log("failed to find sprite path for name " .. name)
     end
 end
+
+return PrototypeInfo
