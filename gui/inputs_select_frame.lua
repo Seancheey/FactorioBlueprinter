@@ -1,5 +1,6 @@
 --- @type BlueprintGraph
 local BlueprintGraph = require("blueprint_gen.blueprint_graph")
+local assertNotNull = require("__MiscLib__/assert_not_null")
 
 local function create_input_buttons(player_index, gui_parent, blueprint_graph)
     local function recreate_input_buttons()
@@ -26,7 +27,7 @@ local function create_input_buttons(player_index, gui_parent, blueprint_graph)
 end
 
 function create_inputs_select_frame(player_index, output_specs)
-    assertAllTruthy(player_index, output_specs)
+    assertNotNull(player_index, output_specs)
     local blueprint_graph = BlueprintGraph.new(player_index)
     blueprint_graph:generate_graph_by_outputs(output_specs)
     local frame = gui_root(player_index).add{ name = inputs_select_frame, type= "frame", caption = "Input Source Select", direction = "vertical"}

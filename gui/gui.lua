@@ -1,3 +1,5 @@
+local assertNotNull = require("__MiscLib__/assert_not_null")
+
 --- @class OutputSpec one blueprint output specification
 --- @field crafting_speed number speed
 --- @field unit number crafting speed unit multiplier, with item/s as 1
@@ -26,7 +28,7 @@ function remove_gui(player_index, gui)
 end
 
 function remove_all_gui_children(player_index, gui_elem)
-    assertAllTruthy(player_index, gui_elem)
+    assertNotNull(player_index, gui_elem)
 
     for _, child in ipairs(gui_elem.children) do
         unregister_all_handlers(player_index, child)
@@ -36,7 +38,7 @@ end
 
 --- initialize gui of player with player_index at gui_area
 function init_player_gui(player_index)
-    assertAllTruthy(player_index)
+    assertNotNull(player_index)
 
     remove_gui(player_index, main_button)
     remove_gui(player_index, main_function_frame)

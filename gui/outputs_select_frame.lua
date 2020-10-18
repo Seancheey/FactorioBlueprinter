@@ -1,11 +1,18 @@
 local PlayerInfo = require("player_info")
 --- @type AssemblerNode
 local AssemblerNode = require("blueprint_gen.assembler_node")
+local assertNotNull = require("__MiscLib__/assert_not_null")
+--- @type ArrayList
+local ArrayList = require("__MiscLib__/array_list")
+--- @type Vector2D
+local Vector2D = require("__MiscLib__/vector2d")
+--- @type Pointer
+local Pointer = require("__MiscLib__/pointer")
 
 --- add a new output item selection box for player with *player_index* at *parent* gui element
 --- @param parent LuaGuiElement
 local function add_output_item_selection_box(player_index, parent, outputs_specifications)
-    assertAllTruthy(player_index, parent, outputs_specifications)
+    assertNotNull(player_index, parent, outputs_specifications)
 
     local row_num = #outputs_specifications + 1
     outputs_specifications[row_num] = { crafting_speed = 1, unit = output_units[1] }
@@ -93,7 +100,7 @@ end
 
 local function create_outputs_select_tab(player_index, tab_pane)
     --- @type OutputSpec[] player's specified blueprint outputs
-    local output_specifications = toArrayList {}
+    local output_specifications = ArrayList.new {}
 
     local output_tab = tab_pane.add { type = "tab", name = "outputs_tab", caption = "whole factory" }
     local output_flow = tab_pane.add { type = "flow", name = "output_flow", direction = "vertical" }
@@ -115,7 +122,7 @@ local CraftingUnitSelectTab = {}
 --- @param gui_parent LuaGuiElement
 --- @return LuaGuiElement repeat number selector
 function CraftingUnitSelectTab.create_repeat_num_selector(player_index, gui_parent, repetition_num_pointer, recipe_max_repetition)
-    assertAllTruthy(player_index, gui_parent, repetition_num_pointer, recipe_max_repetition)
+    assertNotNull(player_index, gui_parent, repetition_num_pointer, recipe_max_repetition)
 
     local repeat_num_frame = gui_parent.add { name = "repeat_num_frame", type = "frame", direction = "horizontal", caption = "Choose unit number" }
     repeat_num_frame.add { name = "repeat_num_label", type = "label", caption = "repeat unit" }
@@ -153,7 +160,7 @@ end
 --- @param gui_parent LuaGuiElement
 --- @param blueprint_pointer Pointer|BlueprintSection[]
 function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, recipe, repetition_pointer)
-    assertAllTruthy(player_index, gui_parent, recipe, repetition_pointer)
+    assertNotNull(player_index, gui_parent, recipe, repetition_pointer)
 
     local confirm_button = gui_parent.add { name = "confirm_button", type = "button", caption = "Confirm" }
     register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click, function(e)
@@ -178,7 +185,7 @@ end
 --- @param gui_parent LuaGuiElement
 --- @return LuaGuiElement
 function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_parent, crafting_machine_name)
-    assertAllTruthy(player_index, gui_parent, crafting_machine_name)
+    assertNotNull(player_index, gui_parent, crafting_machine_name)
 
     local direction_frame = gui_parent.add { name = "direction_select_frame", type = "frame", direction = "vertical", caption = "Choose flow direction" }
     do
@@ -319,7 +326,7 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
 end
 
 function create_main_function_frame(player_index)
-    assertAllTruthy(player_index)
+    assertNotNull(player_index)
 
     local frame = gui_root(player_index).add { type = "frame", name = main_function_frame, caption = "Blueprinter" }
     local tab_pane = frame.add { type = "tabbed-pane", name = "outputs_tab_pane", caption = "outputs", direction = "vertical" }

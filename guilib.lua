@@ -1,4 +1,6 @@
-require("util")
+local assertNotNull = require("__MiscLib__/assert_not_null")
+--- @type Logger
+local logging = require("__MiscLib__/logging")
 
 local guilib_listening_events = {
     defines.events.on_gui_click,
@@ -47,7 +49,7 @@ function start_listening_events()
             end
 
             if not gui_handlers[e.player_index] or not gui_handlers[e.player_index][event] then
-                print_log("no gui_handlers for player", logging.W)
+                logging.log("no gui_handlers for player", logging.W)
                 return
             end
 
@@ -68,7 +70,7 @@ end
 --- @param event defines.events
 --- @param handler fun(e)
 function register_gui_event_handler(player_index, gui_elem, event, handler)
-    assertAllTruthy(player_index, gui_elem, event, handler)
+    assertNotNull(player_index, gui_elem, event, handler)
     assert(type(handler) == "function", "handler should be a function")
     assert(gui_elem.name ~= "", "gui's name can't be nil")
 
@@ -85,14 +87,14 @@ end
 --- register a global handler for a certain event for gui element with gui_path
 --- this function is particularly useful for events handling on script loading stage, where no player is availiable
 function register_global_gui_event_handler(gui_path, event, handler)
-    assertAllTruthy(gui_path, event, handler)
+    assertNotNull(gui_path, event, handler)
 
     global_gui_handlers[event] = global_gui_handlers[event] or {}
     global_gui_handlers[event][gui_path] = handler
 end
 
 function unregister_gui_event_handler(player_index, gui_elem, event)
-    assertAllTruthy(player_index, gui_elem, event)
+    assertNotNull(player_index, gui_elem, event)
 
     gui_handlers[player_index][event][path_of(gui_elem)] = nil
 end
@@ -105,7 +107,7 @@ end
 
 --- unregister all handlers of gui_elem and its children
 function unregister_all_handlers(player_index, gui_elem)
-    assertAllTruthy(player_index, gui_elem)
+    assertNotNull(player_index, gui_elem)
 
     for _, event in pairs(guilib_listening_events) do
         if gui_handlers[player_index] and gui_handlers[player_index][event] then
@@ -119,7 +121,7 @@ end
 
 --- @return LuaGuiElement root gui of player for this mod
 function gui_root(player_index)
-    assertAllTruthy(player_index)
+    assertNotNull(player_index)
 
     local root = game.players[player_index].gui[gui_root_name]
     assert(root ~= nil, "unable to find player's gui root")
@@ -129,7 +131,7 @@ end
 --- @param gui_elem LuaGuiElement
 --- @return string the path of a gui element represented by "root_name|parent_name|my_name ..."
 function path_of(gui_elem)
-    assertAllTruthy(gui_elem)
+    assertNotNull(gui_elem)
 
     local current_element = gui_elem
     local path = ""
@@ -154,7 +156,7 @@ end
 --- @param player_index player_index
 --- @return LuaGuiElement
 function elem_of(path, player_index)
-    assertAllTruthy(path, player_index)
+    assertNotNull(path, player_index)
 
     local path_list = __split_path(path)
     local i = 1
@@ -171,7 +173,7 @@ function elem_of(path, player_index)
             end
         end
         if not found then
-            print_log("path children is not found/invalid when finding " .. path_list[i+1] .. " whole path:" .. serpent.line(path_list), logging.W)
+            logging.log("path children is not found/invalid when finding " .. path_list[i+1] .. " whole path:" .. serpent.line(path_list), logging.W)
             return nil
         end
     end

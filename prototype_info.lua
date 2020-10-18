@@ -1,3 +1,8 @@
+--- @type ArrayList
+local ArrayList = require("__MiscLib__/array_list")
+--- @type Vector2D
+local Vector2D = require("__MiscLib__/vector2d")
+
 --- Since we cannot access prototype information outside game loading stage, we need extra prototype information to support any crafting machines with fluid boxes.
 local prototype_addition = {
     -- Below is fluid prototypes of the base game
@@ -79,7 +84,7 @@ ALL_BELTS = { "transport-belt", "fast-transport-belt", "express-transport-belt" 
 
 
 --- fields that allows prototype.field == nil to exist.
-local nullable_fields = toArrayList({ "fluid_boxes" })
+local nullable_fields = ArrayList.new{ "fluid_boxes" }
 
 --- @return any an entity prototype with additional information if available
 function get_entity_prototype(name)
