@@ -8,6 +8,12 @@ local ArrayList = require("__MiscLib__/array_list")
 local Vector2D = require("__MiscLib__/vector2d")
 --- @type Pointer
 local Pointer = require("__MiscLib__/pointer")
+--- @type GuiLib
+local GuiLib = require("__MiscLib__/guilib")
+local register_gui_event_handler = GuiLib.registerGuiHandler
+local elem_of = GuiLib.elem_of
+local path_of = GuiLib.path_of
+local gui_root = GuiLib.gui_root
 
 --- add a new output item selection box for player with *player_index* at *parent* gui element
 --- @param parent LuaGuiElement
@@ -27,7 +33,7 @@ local function add_output_item_selection_box(player_index, parent, outputs_speci
                     add_output_item_selection_box(e.player_index, parent, outputs_specifications)
                 end
                 -- any change to output makes input frame disappear
-                remove_gui(e.player_index, inputs_select_frame)
+                GuiLib.removeGuiElementWithName(e.player_index, inputs_select_frame)
             end
     )
     local num_field = parent.add { name = "bp_output_numfield" .. tostring(row_num), type = "textfield", text = "1", numeric = true, allow_negative = false }
@@ -109,7 +115,7 @@ local function create_outputs_select_tab(player_index, tab_pane)
     local confirm_button = output_flow.add { name = "bp_output_confirm_button", type = "button", caption = "confirm" }
     register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click,
             function(e)
-                remove_gui(e.player_index, inputs_select_frame)
+                GuiLib.removeGuiElementWithName(e.player_index, inputs_select_frame)
                 create_inputs_select_frame(e.player_index, output_specifications)
             end
     )
@@ -172,7 +178,7 @@ function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, r
             blueprint.label = recipe.name .. " crafting unit"
             game.players[e.player_index].print("blueprint \"" .. blueprint.label .. "\" created.")
         end
-        remove_gui(e.player_index, main_function_frame)
+        GuiLib.removeGuiElementWithName(e.player_index, main_function_frame)
     end)
     return confirm_button
 end
@@ -301,11 +307,11 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
 
         local direction_frame, repeat_num_selector, confirm_button
         register_gui_event_handler(player_index, choose_button, defines.events.on_gui_elem_changed, function(e)
-            remove_gui(player_index, direction_frame)
+            GuiLib.removeGuiElement(direction_frame)
             direction_frame = nil
-            remove_gui(player_index, repeat_num_selector)
+            GuiLib.removeGuiElement(repeat_num_selector)
             repeat_num_selector = nil
-            remove_gui(player_index, confirm_button)
+            GuiLib.removeGuiElement(confirm_button)
             confirm_button = nil
             if e.element.elem_value then
                 local recipe = game.recipe_prototypes[e.element.elem_value]

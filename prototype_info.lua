@@ -2,6 +2,8 @@
 local ArrayList = require("__MiscLib__/array_list")
 --- @type Vector2D
 local Vector2D = require("__MiscLib__/vector2d")
+--- @type Logger
+local logging = require("__MiscLib__/logging")
 
 --- Since we cannot access prototype information outside game loading stage, we need extra prototype information to support any crafting machines with fluid boxes.
 local prototype_addition = {
@@ -132,10 +134,10 @@ function PrototypeInfo.underground_transport_prototype(transport_name)
         return game.entity_prototypes[corresponding_underground_transport_line_table[transport_name]]
     else
         if game.entity_prototypes[transport_name].belt_speed then
-            print_log(transport_name .. " is not one of known transport belt with underground version")
+            logging.log(transport_name .. " is not one of known transport belt with underground version")
             return game.entity_prototypes["express-underground-belt"]
         elseif game.entity_prototypes[transport_name].fluid_capacity then
-            print_log(transport_name .. "is not one of known pipe with underground version")
+            logging.log(transport_name .. "is not one of known pipe with underground version")
             return game.entity_prototypes["pipe-to-ground"]
         end
     end
@@ -159,7 +161,7 @@ function sprite_of(name)
     elseif game.entity_prototypes[name] then
         return "entity/" .. name
     else
-        print_log("failed to find sprite path for name " .. name)
+        logging.log("failed to find sprite path for name " .. name)
     end
 end
 

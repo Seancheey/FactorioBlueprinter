@@ -1,4 +1,3 @@
-require("guilib")
 require("gui.gui")
 require("gui.outputs_select_frame")
 require("gui.inputs_select_frame")
@@ -6,6 +5,8 @@ require("gui.inputs_select_frame")
 local PlayerInfo = require("player_info")
 --- @type Logger
 local logging = require("__MiscLib__/logging")
+--- @type GuiLib
+local GuiLib = require("__MiscLib__/guilib")
 
 --- @alias player_index number
 
@@ -15,7 +16,6 @@ local function init_all_global()
     --- @type table<player_index, PlayerSetting>
     global.settings = global.settings or {}
 end
-
 
 local function init_player_mod(player_index)
     if not global.settings[player_index] then
@@ -51,13 +51,24 @@ script.on_configuration_changed(function()
     end
 end)
 
-start_listening_events()
+GuiLib.listenToEvents {
+    defines.events.on_gui_click,
+    defines.events.on_gui_opened,
+    defines.events.on_gui_elem_changed,
+    defines.events.on_gui_selection_state_changed,
+    defines.events.on_gui_text_changed,
+    defines.events.on_gui_value_changed,
+}
 
-register_global_gui_event_handler(main_button, defines.events.on_gui_click, function(e)
-    if not gui_root(e.player_index)[main_function_frame] then
+GuiLib.registerPersistentGuiHandler(main_button, defines.events.on_gui_click, function(e)
+    if not GuiLib.gui_root(e.player_index)[main_function_frame] then
         create_main_function_frame(e.player_index)
     else
-        remove_gui(e.player_index, main_function_frame)
-        remove_gui(e.player_index, inputs_select_frame)
+        GuiLib.removeGuiElementWithName(e.player_index, main_function_frame)
+        GuiLib.removeGuiElementWithName(e.player_index, inputs_select_frame)
     end
 end)
+
+if script.active_mods["gvv"] then
+    require("__gvv__.gvv")()
+end
