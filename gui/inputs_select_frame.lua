@@ -3,8 +3,9 @@ local BlueprintGraph = require("blueprint_gen.blueprint_graph")
 local assertNotNull = require("__MiscLib__/assert_not_null")
 --- @type GuiLib
 local GuiLib = require("__MiscLib__/guilib")
-local register_gui_event_handler = GuiLib.registerGuiHandler
 local gui_root = GuiLib.gui_root
+--- @type GuiRootChildrenNames
+local GuiRootNames = require("gui.root_names")
 
 --- @param gui_parent LuaGuiElement
 local function create_input_buttons(player_index, gui_parent, blueprint_graph)
@@ -16,20 +17,32 @@ local function create_input_buttons(player_index, gui_parent, blueprint_graph)
         create_input_buttons(player_index, gui_parent, blueprint_graph)
     end
     for ingredient_name, _ in pairs(blueprint_graph.inputs) do
-        local left_button = gui_parent.add { type = "sprite-button", name = "left_button_" .. ingredient_name, sprite = "utility/left_arrow", tooltip = "use it's ingredient instead" }
-        gui_parent.add { type = "sprite", name = "sprite_" .. ingredient_name, sprite = sprite_of(ingredient_name) }
-        local right_button = gui_parent.add { type = "sprite-button", name = "right_button_" .. ingredient_name, sprite = "utility/right_arrow", tooltip = "use it's targets instead" }
-        register_gui_event_handler(player_index, left_button, defines.events.on_gui_click,
-                function()
-                    BlueprintGraph.use_ingredients_as_input(blueprint_graph, ingredient_name)
-                    recreate_input_buttons()
-                end
+        GuiLib.addGuiElementWithHandler(gui_parent,
+                {
+                    type = "sprite-button",
+                    name = "left_button_" .. ingredient_name,
+                    sprite = "utility/left_arrow",
+                    tooltip = "use it's ingredient instead"
+                },
+                {
+                    [defines.events.on_gui_click] = function()
+                        BlueprintGraph.use_ingredients_as_input(blueprint_graph, ingredient_name)
+                        recreate_input_buttons()
+                    end
+                }
         )
-        register_gui_event_handler(player_index, right_button, defines.events.on_gui_click,
-                function()
-                    BlueprintGraph.use_products_as_input(blueprint_graph, ingredient_name)
-                    recreate_input_buttons()
-                end
+        gui_parent.add { type = "sprite", name = "sprite_" .. ingredient_name, sprite = sprite_of(ingredient_name) }
+        GuiLib.addGuiElementWithHandler(gui_parent,
+                { type = "sprite-button",
+                  name = "right_button_" .. ingredient_name,
+                  sprite = "utility/right_arrow",
+                  tooltip = "use it's targets instead"
+                }, {
+                    [defines.events.on_gui_click] = function()
+                        BlueprintGraph.use_products_as_input(blueprint_graph, ingredient_name)
+                        recreate_input_buttons()
+                    end
+                }
         )
     end
 end
@@ -38,7 +51,7 @@ function create_inputs_select_frame(player_index, output_specs)
     assertNotNull(player_index, output_specs)
     local blueprint_graph = BlueprintGraph.new(player_index)
     blueprint_graph:generate_graph_by_outputs(output_specs)
-    local frame = gui_root(player_index).add { name = inputs_select_frame, type = "frame", caption = "Input Source Select", direction = "vertical" }
+    local frame = gui_root(player_index).add { name = GuiRootNames.inputs_select_frame, type = "frame", caption = "Input Source Select", direction = "vertical" }
     local hori_flow = frame.add { type = "table", name = "hori_flow", column_count = 2 }
     local input_select_frame = hori_flow.add { type = "frame", name = "input_select_frame", caption = "Input Items Select" }
     local inputs_flow = input_select_frame.add { type = "flow", name = "inputs_flow", direction = "vertical" }
@@ -51,15 +64,12 @@ function create_inputs_select_frame(player_index, output_specs)
         outputs_view_flow.add { type = "sprite", sprite = sprite_of(output_name) }
     end
     outputs_view_flow.style.vertically_stretchable = true
-    local confirm_button = frame.add { type = "button", name = "confirm_button", caption = "confirm" }
-    register_gui_event_handler(
-            player_index,
-            confirm_button,
-            defines.events.on_gui_click,
-            function(e)
-                -- TODO generate a real blueprint
-                game.players[e.player_index].print("This function is currently not yet completed, it's under active development.")
-            end
-    )
+    GuiLib.addGuiElementWithHandler(frame, { type = "button", name = "confirm_button", caption = "confirm" },
+            {
+                [defines.events.on_gui_click] = function(e)
+                    -- TODO generate a real blueprint
+                    game.players[e.player_index].print("This function is currently not yet completed, it's under active development.")
+                end
+            })
 end
 

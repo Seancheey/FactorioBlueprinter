@@ -1,4 +1,4 @@
-require("gui.gui")
+require("gui.root_names")
 local PlayerInfo = require("player_info")
 
 local testing_recipes = { "copper-plate", "transport-belt", "steel-chest", "advanced-oil-processing", "coal-liquefaction", "explosives" }

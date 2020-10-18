@@ -1,4 +1,4 @@
-require("gui.gui")
+require("gui.root_names")
 require("gui.outputs_select_frame")
 require("gui.inputs_select_frame")
 
@@ -7,8 +7,19 @@ local PlayerInfo = require("player_info")
 local logging = require("__MiscLib__/logging")
 --- @type GuiLib
 local GuiLib = require("__MiscLib__/guilib")
+--- @type GuiRootChildrenNames
+local GuiRootNames = require("gui.root_names")
 
 --- @alias player_index number
+
+GuiLib.listenToEvents {
+    defines.events.on_gui_click,
+    defines.events.on_gui_opened,
+    defines.events.on_gui_elem_changed,
+    defines.events.on_gui_selection_state_changed,
+    defines.events.on_gui_text_changed,
+    defines.events.on_gui_value_changed,
+}
 
 -- initialize global data as empty if they are nil
 -- Note that global data cannot be metatable
@@ -21,7 +32,26 @@ local function init_player_mod(player_index)
     if not global.settings[player_index] then
         PlayerInfo.set_default_settings(player_index)
     end
-    init_player_gui(player_index)
+    for _, childName in pairs(GuiRootNames) do
+        GuiLib.removeGuiElementWithName(player_index, childName)
+    end
+    GuiLib.addGuiElementWithHandler(GuiLib.gui_root(player_index),
+            {
+                type = "button",
+                tooltip = "Click to open Blueprinter.",
+                caption = "Blueprinter",
+                name = GuiRootNames.main_button
+            }, {
+                [defines.events.on_gui_click] = function(e)
+                    if not GuiLib.gui_root(e.player_index)[GuiRootNames.main_function_frame] then
+                        create_main_function_frame(e.player_index)
+                    else
+                        GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.main_function_frame)
+                        GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.inputs_select_frame)
+                    end
+                end
+            }
+    )
 end
 
 
@@ -51,24 +81,7 @@ script.on_configuration_changed(function()
     end
 end)
 
-GuiLib.listenToEvents {
-    defines.events.on_gui_click,
-    defines.events.on_gui_opened,
-    defines.events.on_gui_elem_changed,
-    defines.events.on_gui_selection_state_changed,
-    defines.events.on_gui_text_changed,
-    defines.events.on_gui_value_changed,
-}
-
-GuiLib.registerPersistentGuiHandler(main_button, defines.events.on_gui_click, function(e)
-    if not GuiLib.gui_root(e.player_index)[main_function_frame] then
-        create_main_function_frame(e.player_index)
-    else
-        GuiLib.removeGuiElementWithName(e.player_index, main_function_frame)
-        GuiLib.removeGuiElementWithName(e.player_index, inputs_select_frame)
-    end
-end)
-
+-- used for debugging purpose only
 if script.active_mods["gvv"] then
     require("__gvv__.gvv")()
 end

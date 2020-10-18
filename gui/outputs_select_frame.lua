@@ -10,10 +10,14 @@ local Vector2D = require("__MiscLib__/vector2d")
 local Pointer = require("__MiscLib__/pointer")
 --- @type GuiLib
 local GuiLib = require("__MiscLib__/guilib")
-local register_gui_event_handler = GuiLib.registerGuiHandler
 local elem_of = GuiLib.elem_of
 local path_of = GuiLib.path_of
 local gui_root = GuiLib.gui_root
+--- @type GuiRootChildrenNames
+local GuiRootNames = require("gui.root_names")
+
+local unit_values = { ["item/s"] = 1, ["item/min"] = 60 }
+local output_units = { "item/s", "item/min" }
 
 --- add a new output item selection box for player with *player_index* at *parent* gui element
 --- @param parent LuaGuiElement
@@ -23,7 +27,7 @@ local function add_output_item_selection_box(player_index, parent, outputs_speci
     local row_num = #outputs_specifications + 1
     outputs_specifications[row_num] = { crafting_speed = 1, unit = output_units[1] }
     local choose_button = parent.add { name = "bp_output_choose_button" .. tostring(row_num), type = "choose-elem-button", elem_type = "recipe" }
-    register_gui_event_handler(player_index, choose_button, defines.events.on_gui_elem_changed,
+    GuiLib.registerGuiHandler(choose_button, defines.events.on_gui_elem_changed,
             function(e)
                 outputs_specifications[row_num].ingredient = e.element.elem_value
                 -- expand table if full
@@ -33,19 +37,19 @@ local function add_output_item_selection_box(player_index, parent, outputs_speci
                     add_output_item_selection_box(e.player_index, parent, outputs_specifications)
                 end
                 -- any change to output makes input frame disappear
-                GuiLib.removeGuiElementWithName(e.player_index, inputs_select_frame)
+                GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.inputs_select_frame)
             end
     )
     local num_field = parent.add { name = "bp_output_numfield" .. tostring(row_num), type = "textfield", text = "1", numeric = true, allow_negative = false }
     num_field.style.maximal_width = 50
-    register_gui_event_handler(player_index, num_field, defines.events.on_gui_text_changed,
+    GuiLib.registerGuiHandler(num_field, defines.events.on_gui_text_changed,
             function(e)
                 local item_choice = outputs_specifications[row_num]
                 item_choice.crafting_speed = (e.element.text ~= "" and tonumber(e.element.text) or 0) / unit_values[item_choice.unit]
             end
     )
     local unit_box = parent.add { name = "bp_output_dropdown" .. tostring(row_num), type = "drop-down", items = output_units, selected_index = 1 }
-    register_gui_event_handler(player_index, unit_box, defines.events.on_gui_selection_state_changed,
+    GuiLib.registerGuiHandler(unit_box, defines.events.on_gui_selection_state_changed,
             function(e)
                 local item_choice = outputs_specifications[row_num]
                 item_choice.unit = output_units[e.element.selected_index]
@@ -66,7 +70,7 @@ local function create_settings_tab(player_index, tab_pane)
     for i, factory in ipairs(global.settings[player_index].factory_priority) do
         priority_table.add { type = "sprite", name = "sprite_" .. tostring(i), sprite = sprite_of(factory.name) }
         local factory_button = priority_table.add { type = "sprite-button", name = "sort_up_" .. tostring(i), sprite = "utility/left_arrow" }
-        register_gui_event_handler(player_index, factory_button, defines.events.on_gui_click,
+        GuiLib.registerGuiHandler(factory_button, defines.events.on_gui_click,
                 function(e)
                     -- eliminate first button
                     if i <= 1 then
@@ -90,7 +94,7 @@ local function create_settings_tab(player_index, tab_pane)
     for i, belt_name in ipairs(ALL_BELTS) do
         belt_choose_table.add { type = "sprite", sprite = sprite_of(belt_name) }
         local choose_button = belt_choose_table.add { name = "bp_setting_choose_belt_button" .. tostring(i), type = "radiobutton", state = global.settings[player_index].belt == i }
-        register_gui_event_handler(player_index, choose_button, defines.events.on_gui_click,
+        GuiLib.registerGuiHandler(choose_button, defines.events.on_gui_click,
                 function(e)
                     global.settings[e.player_index].belt = i
                     for other = 1, 3 do
@@ -113,9 +117,9 @@ local function create_outputs_select_tab(player_index, tab_pane)
     local output_table = output_flow.add { type = "table", name = "output_table", caption = "select output items", column_count = 3 }
     add_output_item_selection_box(player_index, output_table, output_specifications)
     local confirm_button = output_flow.add { name = "bp_output_confirm_button", type = "button", caption = "confirm" }
-    register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click,
+    GuiLib.registerGuiHandler(confirm_button, defines.events.on_gui_click,
             function(e)
-                GuiLib.removeGuiElementWithName(e.player_index, inputs_select_frame)
+                GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.inputs_select_frame)
                 create_inputs_select_frame(e.player_index, output_specifications)
             end
     )
@@ -140,7 +144,7 @@ function CraftingUnitSelectTab.create_repeat_num_selector(player_index, gui_pare
     repeat_num_slider.style.maximal_width = 80
     repeat_num_slider.set_slider_minimum_maximum(1, (recipe_max_repetition > 100) and 100 or recipe_max_repetition)
     repeat_num_frame.add { name = "max_repetition_lavel", type = "label", caption = "(capacity: " .. tostring(recipe_max_repetition) .. ")" }
-    register_gui_event_handler(player_index, repeat_num_field, defines.events.on_gui_text_changed, function(e)
+    GuiLib.registerGuiHandler(repeat_num_field, defines.events.on_gui_text_changed, function(e)
         local new_repeat = tonumber(e.element.text)
         if new_repeat then
             new_repeat = new_repeat > recipe_max_repetition and recipe_max_repetition or new_repeat
@@ -153,7 +157,7 @@ function CraftingUnitSelectTab.create_repeat_num_selector(player_index, gui_pare
             end
         end
     end)
-    register_gui_event_handler(player_index, repeat_num_slider, defines.events.on_gui_value_changed, function(e)
+    GuiLib.registerGuiHandler(repeat_num_slider, defines.events.on_gui_value_changed, function(e)
         local new_repeat = math.ceil(e.element.slider_value)
         if new_repeat ~= Pointer.get(repetition_num_pointer) then
             Pointer.set(repetition_num_pointer, new_repeat)
@@ -169,7 +173,7 @@ function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, r
     assertNotNull(player_index, gui_parent, recipe, repetition_pointer)
 
     local confirm_button = gui_parent.add { name = "confirm_button", type = "button", caption = "Confirm" }
-    register_gui_event_handler(player_index, confirm_button, defines.events.on_gui_click, function(e)
+    GuiLib.registerGuiHandler(confirm_button, defines.events.on_gui_click, function(e)
         local new_unit, _, direction_spec = AssemblerNode.new({ recipe = recipe, player_index = e.player_index }):generate_crafting_unit()
         local blueprint_section = new_unit:repeat_self(Pointer.get(repetition_pointer))
         blueprint_section:rotate(direction_spec.blueprintRotation)
@@ -178,7 +182,7 @@ function CraftingUnitSelectTab.create_confirm_button(player_index, gui_parent, r
             blueprint.label = recipe.name .. " crafting unit"
             game.players[e.player_index].print("blueprint \"" .. blueprint.label .. "\" created.")
         end
-        GuiLib.removeGuiElementWithName(e.player_index, main_function_frame)
+        GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.main_function_frame)
     end)
     return confirm_button
 end
@@ -254,7 +258,7 @@ function CraftingUnitSelectTab.create_direction_select_frame(player_index, gui_p
                     -- 4 inputs direction button should reverse its arrow direction, other 4 outputs direction button should stay the same
                     local arrow_direction = (direction % 2 == 0) and ((direction + 4) % 8) or direction
                     direction_buttons[direction] = belt_direction_table.add { type = "sprite-button", name = "direction_button_" .. tostring(direction), sprite = direction_sprite(arrow_direction) }
-                    register_gui_event_handler(player_index, direction_buttons[direction], defines.events.on_gui_click, function()
+                    GuiLib.registerGuiHandler(direction_buttons[direction], defines.events.on_gui_click, function()
                         -- create a mapping from (4 input direction + 4 output direction) to (inputs belt left/right + outputs belt left/right + 4 rotation)
                         update_direction_preference(direction)
                     end)
@@ -306,7 +310,7 @@ local function create_crafting_unit_select_tab(player_index, tab_pane)
         } }
 
         local direction_frame, repeat_num_selector, confirm_button
-        register_gui_event_handler(player_index, choose_button, defines.events.on_gui_elem_changed, function(e)
+        GuiLib.registerGuiHandler(choose_button, defines.events.on_gui_elem_changed, function(e)
             GuiLib.removeGuiElement(direction_frame)
             direction_frame = nil
             GuiLib.removeGuiElement(repeat_num_selector)
@@ -334,7 +338,7 @@ end
 function create_main_function_frame(player_index)
     assertNotNull(player_index)
 
-    local frame = gui_root(player_index).add { type = "frame", name = main_function_frame, caption = "Blueprinter" }
+    local frame = gui_root(player_index).add { type = "frame", name = GuiRootNames.main_function_frame, caption = "Blueprinter" }
     local tab_pane = frame.add { type = "tabbed-pane", name = "outputs_tab_pane", caption = "outputs", direction = "vertical" }
 
     create_crafting_unit_select_tab(player_index, tab_pane)
