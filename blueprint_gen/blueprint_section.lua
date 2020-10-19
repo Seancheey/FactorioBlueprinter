@@ -5,15 +5,16 @@ local logging = require("__MiscLib__/logging")
 local ArrayList = require("__MiscLib__/array_list")
 --- @type Copier
 local Copier = require("__MiscLib__/copy")
+--- @type Vector2D
+local Vector2D = require("__MiscLib__/vector2d")
 local deep_copy = Copier.deep_copy
+
 --- @class BlueprintSection
 --- @field entities Entity[]
 --- @field inlets ConnectionPoint[]
 --- @field outlets ConnectionPoint[]
---- @type BlueprintSection
 local BlueprintSection = {}
 BlueprintSection.__index = BlueprintSection
-
 
 --- @return BlueprintSection
 function BlueprintSection.new()
@@ -117,6 +118,30 @@ function BlueprintSection:height()
     end
     local height = math.floor((max or 0) - (min or 0) + 0.5)
     return height
+end
+
+--- @return Vector2D, Vector2D left_top and right_bottom
+function BlueprintSection:boundingBox()
+    local x_min, x_max, y_min, y_max
+    for _, entity in ipairs(self.entities) do
+        local x_test_min = entity.position.x + game.entity_prototypes[entity.name].selection_box.left_top.x
+        if not x_min or x_test_min < x_min then
+            x_min = math.floor(x_test_min + 0.5)
+        end
+        local test_max = entity.position.x + game.entity_prototypes[entity.name].selection_box.right_bottom.x
+        if not x_max or test_max > x_max then
+            x_max = math.floor(test_max + 0.5)
+        end
+        local y_test_min = entity.position.y + game.entity_prototypes[entity.name].selection_box.left_top.y
+        if not y_min or y_test_min < y_min then
+            y_min = math.floor(y_test_min + 0.5)
+        end
+        local y_test_max = entity.position.y + game.entity_prototypes[entity.name].selection_box.right_bottom.y
+        if y_max or y_test_max > y_max then
+            y_max = math.floor(y_test_max + 0.5)
+        end
+    end
+    return Vector2D.new(x_min, y_min), Vector2D.new(x_max, y_max)
 end
 
 function BlueprintSection:shift(x_off, y_off)
