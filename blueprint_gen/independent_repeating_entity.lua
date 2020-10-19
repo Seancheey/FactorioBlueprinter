@@ -21,9 +21,12 @@ function IndependentRepeatingEntity:new(o)
 end
 
 --- @param blueprintSection BlueprintSection
+--- @return boolean true if we can still place next entity
 function IndependentRepeatingEntity:placeNextEntity(blueprintSection)
     assertNotNull(self, blueprintSection)
-
+    if not self.nextPosition then
+        return
+    end
     local newEntitySpec = {
         name = self.entity,
         position = self.nextPosition
@@ -40,7 +43,12 @@ function IndependentRepeatingEntity:placeNextEntity(blueprintSection)
         local newNextPosition = Vector2D.fromDirection(self.repeatingDirection):scale(tryStepSize)
         if newNextPosition.x >= leftTop.x and newNextPosition.y >= leftTop.y and
                 newNextPosition.x <= rightBottom.x and newNextPosition.y <= rightBottom.y then
-            
+            if not blueprintSection:positionIsOccupied(newNextPosition) then
+                self.nextPosition = newNextPosition
+                return true
+            end
         end
     end
+    self.nextPosition = nil
+    return false
 end

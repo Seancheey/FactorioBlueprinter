@@ -172,6 +172,18 @@ function BlueprintSection:clear_overlap()
     end
 end
 
+--- @param position Vector2D
+--- @return boolean
+function BlueprintSection:positionIsOccupied(position)
+    -- TODO: use dictionary to avoid iterating all entity and achieve better performance
+    for _, entity in pairs(self.entities) do
+        if entity.position == position then
+            return true
+        end
+    end
+    return false
+end
+
 --- @param n_times number
 --- @return BlueprintSection
 function BlueprintSection:repeat_self(n_times)
