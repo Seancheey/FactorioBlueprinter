@@ -13,4 +13,12 @@ function BlueprintGeneratorUtil.average_amount_of(crafting_item)
     return crafting_item.amount or ((crafting_item.amount_max + crafting_item.amount_min) / 2)
 end
 
+--- @param recipe LuaRecipePrototype
+--- @param crafter LuaEntityPrototype
+--- @param inserterIngredientsMapping table<string, string[]> inserter's name to the ingredients it can grab
+--- @return table<string, number> speed table of ingredient/product name to number of items crafted per sec
+function BlueprintGeneratorUtil.calculateRecipeCraftingSpeed(recipe, crafter, inserterIngredientsMapping)
+
+end
+
 return BlueprintGeneratorUtil
