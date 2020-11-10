@@ -35,25 +35,25 @@ local function init_player_mod(player_index)
     for _, childName in pairs(GuiRootNames) do
         GuiLib.removeGuiElementWithName(player_index, childName)
     end
-    GuiLib.addGuiElementWithHandler(GuiLib.gui_root(player_index),
-            {
-                type = "button",
-                tooltip = "Click to open Blueprinter.",
-                caption = "Blueprinter",
-                name = GuiRootNames.main_button
-            }, {
-                [defines.events.on_gui_click] = function(e)
-                    if not GuiLib.gui_root(e.player_index)[GuiRootNames.main_function_frame] then
-                        create_main_function_frame(e.player_index)
-                    else
-                        GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.main_function_frame)
-                        GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.inputs_select_frame)
-                    end
-                end
-            }
-    )
+    GuiLib.gui_root(player_index).add {
+        type = "button",
+        tooltip = "Click to open Blueprinter.",
+        caption = "Blueprinter",
+        name = GuiRootNames.main_button
+    }
+
 end
 
+GuiLib.registerGuiHandlerForAllPlayers(GuiLib.rootName .. "|" .. GuiRootNames.main_button, {
+    [defines.events.on_gui_click] = function(e)
+        if not GuiLib.gui_root(e.player_index)[GuiRootNames.main_function_frame] then
+            create_main_function_frame(e.player_index)
+        else
+            GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.main_function_frame)
+            GuiLib.removeGuiElementWithName(e.player_index, GuiRootNames.inputs_select_frame)
+        end
+    end
+})
 
 -- Only called when starting a new game / loading a game without this mod
 script.on_init(function()
