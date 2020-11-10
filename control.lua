@@ -9,8 +9,16 @@ local logging = require("__MiscLib__/logging")
 local GuiLib = require("__MiscLib__/guilib")
 --- @type GuiRootChildrenNames
 local GuiRootNames = require("gui.root_names")
+local releaseMode = require("release_mode")
 
 --- @alias player_index number
+
+if releaseMode then
+    logging.disableCategory(logging.D)
+    logging.disableCategory(logging.I)
+    logging.disableCategory(logging.V)
+    logging.disableCategory(logging.W)
+end
 
 GuiLib.listenToEvents {
     defines.events.on_gui_click,
