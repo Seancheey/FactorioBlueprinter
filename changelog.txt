@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.0
+Date: 2020.11.10
+  Optimisations:
+    - Fix bug that crash scenario edit mode
+    - Massive migration of util library to MiscLib
+
+---------------------------------------------------------------------------------------------------
 Version: 0.7.0
 Date: 2020.09.20
   Feature:
