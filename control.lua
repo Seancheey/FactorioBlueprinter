@@ -18,6 +18,7 @@ if releaseMode then
     logging.disableCategory(logging.I)
     logging.disableCategory(logging.V)
     logging.disableCategory(logging.W)
+    logging.disableCategory("guilib")
 end
 
 GuiLib.listenToEvents {
