@@ -1,10 +1,16 @@
-local test_all = true
+require("gui.root_names")
+local PlayerInfo = require("player_info")
 
-require("gui.gui")
+local testing_recipes = { "copper-plate", "transport-belt", "steel-chest", "advanced-oil-processing", "coal-liquefaction", "explosives" }
+local testing_speed = { 0.01, 1, 50 }
 
-function start_unit_tests()
-    if test_all then
-        test_array_list()
+function start_unit_tests(player_index)
+    if false then
+        for _, recipe_name in ipairs(testing_recipes) do
+            for _, speed in ipairs(testing_speed) do
+                insert_assembler_node(recipe_name, player_index, speed)
+            end
+        end
     end
 end
 
@@ -16,10 +22,9 @@ function insert_test_blueprint(recipe_name, player_index)
     graph:generate_blueprint()
 end
 
-function test_array_list()
-    local a = ArrayList.new()
-    a:add(1)
-    a:add(2)
-    a:addAll({ 3, 4 })
-    assert(a == { 1, 2, 3, 4 })
+function insert_assembler_node(recipe_name, player_index, recipe_speed)
+    local node = AssemblerNode.new({ recipe = game.recipe_prototypes[recipe_name], player_index = player_index, recipe_speed = recipe_speed })
+    local section = node:generate_section()
+    PlayerInfo.insert_blueprint(player_index, section.entities)
 end
+

@@ -1,5 +1,11 @@
-PlayerInfo = {}
+local PlayerInfo = {}
+
+local assertNotNull = require("__MiscLib__/assert_not_null")
+--- @type ArrayList
+local ArrayList = require("__MiscLib__/array_list")
 PlayerInfo.__index = PlayerInfo
+--- @type Logger
+local logging = require("__MiscLib__/logging")
 
 --- @class PlayerSetting
 --- @field factory_priority LuaEntityPrototype[] factory prototype
@@ -13,7 +19,7 @@ PlayerInfo.__index = PlayerInfo
 
 --- @return LuaEntityPrototype[]
 function PlayerInfo.unlocked_crafting_machines(player_index)
-    local all_factory_list = toArrayList()
+    local all_factory_list = ArrayList.new()
     for _, entity in pairs(game.get_filtered_entity_prototypes({
         { filter = "crafting-machine" },
         { filter = "hidden", invert = true, mode = "and" },
@@ -36,32 +42,27 @@ function PlayerInfo.unlocked_crafting_machines(player_index)
     return unlocked_factories
 end
 
---- @return LuaEntityPrototype[]
-function PlayerInfo.unlocked_belts(player_index)
-
-end
-
 --- @return table<number, LuaEntityPrototype[]> inserters table, keyed by insert arm length, list is ordered by inserter speed, ascending, this list doesn't contain any filter/burner inserter since we are not using them anyway
 function PlayerInfo.unlocked_inserters(player_index)
     --- @type LuaEntityPrototype[]
-    local inserter_list = toArrayList(PlayerInfo.unlocked_recipes(player_index)):filter(function(recipe)
+    local inserter_list = ArrayList.new(PlayerInfo.unlocked_recipes(player_index)):filter(function(recipe)
         return game.entity_prototypes[recipe.name] and game.entity_prototypes[recipe.name].inserter_rotation_speed ~= nil and game.entity_prototypes[recipe.name].filter_count == 0 and recipe.name ~= "burner-inserter"
     end)                                                                        :map(function(recipe)
         return game.entity_prototypes[recipe.name]
     end)
-    local sorted_lists = toArrayList()
+    local sorted_lists = ArrayList.new()
     for _, inserter in ipairs(inserter_list) do
         local pickup_location = inserter.inserter_pickup_position
-        print_log(serpent.line(pickup_location))
+        logging.log(serpent.line(pickup_location))
         local inserter_arm_length = math.max(math.floor(math.abs(pickup_location[1])), math.floor(math.abs(pickup_location[2])))
         if not sorted_lists[inserter_arm_length] then
-            sorted_lists[inserter_arm_length] = toArrayList()
+            sorted_lists[inserter_arm_length] = ArrayList.new()
         end
         sorted_lists[inserter_arm_length]:insert_by_order(inserter, function(a, b)
             return a.inserter_rotation_speed < b.inserter_rotation_speed
         end)
     end
-    --print_log(serpent.block(sorted_lists:map(function(list)
+    --logging.log(serpent.block(sorted_lists:map(function(list)
     --    return list:map(function(inserter)
     --        return { name = inserter.name, filter_count = inserter.filter_count, inserter_rotation_speed = inserter.inserter_rotation_speed}
     --    end)
@@ -71,7 +72,7 @@ end
 
 --- @return LuaRecipePrototype[]
 function PlayerInfo.unlocked_recipes(player_index)
-    assertAllTruthy(player_index)
+    assertNotNull(player_index)
 
     local all_recipes = game.get_player(player_index).force.recipes
     local unlocked_recipes = ArrayList.filter(all_recipes,
@@ -111,7 +112,7 @@ function PlayerInfo.get_crafting_machine_prototype(player_index, recipe)
         end
     end
     -- if there is no player preference, select first available
-    print_log("no player preference matches recipe prototype, the recipe is probably uncraftable for now.", logging.D)
+    logging.log("no player preference matches recipe prototype, the recipe is probably uncraftable for now.", logging.D)
     return get_entity_prototype(matching_prototypes[1].name)
 end
 
@@ -135,7 +136,7 @@ end
 --- @param inserter_prototype LuaEntityPrototype
 --- @return number stack size
 function PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
-    assertAllTruthy(player_index, inserter_prototype)
+    assertNotNull(player_index, inserter_prototype)
     --- @type LuaForce
     local force = game.players[player_index].force
     return inserter_prototype.stack and (force.stack_inserter_capacity_bonus + 2) or (force.inserter_stack_size_bonus + 1)
@@ -144,7 +145,7 @@ end
 --- @param inserter_prototype LuaEntityPrototype
 --- @return number number of items that the inserter can transfer per second
 function PlayerInfo.inserter_items_speed(player_index, inserter_prototype)
-    assertAllTruthy(player_index, inserter_prototype)
+    assertNotNull(player_index, inserter_prototype)
     return (inserter_prototype.inserter_rotation_speed * 60) * PlayerInfo.inserter_stack_size(player_index, inserter_prototype)
 end
 
@@ -156,7 +157,7 @@ end
 --- @param original_output_position defines.direction
 --- @return InternalDirectionSpec
 function PlayerInfo.get_internal_direction_spec(player_index, original_output_position)
-    assertAllTruthy(player_index, original_output_position)
+    assertNotNull(player_index, original_output_position)
 
     local ui_spec = PlayerInfo.direction_settings(player_index)
     --- @type InternalDirectionSpec
@@ -184,3 +185,41 @@ function PlayerInfo.set_default_settings(player_index)
         direction_spec = { ingredientDirection = defines.direction.east, productDirection = defines.direction.east, productPosition = defines.direction.north }
     }
 end
+
+--- checks for newly unlocked crafting machines and add it to the priority list
+function PlayerInfo.update_crafting_machine_priorities(player_index)
+    local unlocked_factories = PlayerInfo.unlocked_crafting_machines(player_index)
+    local factory_priority = PlayerInfo.crafting_machine_priorities(player_index)
+
+    for _, unlocked_factory in ipairs(unlocked_factories) do
+        if not ArrayList.has(factory_priority, unlocked_factory, function(a, b)
+            return a.name == b.name
+        end) then
+            ArrayList.insert(factory_priority, unlocked_factory)
+        end
+    end
+end
+
+--- insert an blueprint to player's inventory, fail if inventory is full
+--- @param player_index player_index
+--- @param entities Entity[]
+--- @return nil|LuaItemStack nilable, item stack representing the blueprint in the player's inventory
+function PlayerInfo.insert_blueprint(player_index, entities)
+    assertNotNull(player_index, entities)
+
+    local player_inventory = game.players[player_index].get_main_inventory()
+    if not player_inventory.can_insert("blueprint") then
+        logging.log("player's inventory is full, can't insert a new blueprint", logging.I)
+        return
+    end
+    player_inventory.insert("blueprint")
+    for i = 1, #player_inventory, 1 do
+        local item = player_inventory[i]
+        if item.is_blueprint and not item.is_blueprint_setup() then
+            item.set_blueprint_entities(entities)
+            return item
+        end
+    end
+end
+
+return PlayerInfo

@@ -1,3 +1,10 @@
+--- @type ArrayList
+local ArrayList = require("__MiscLib__/array_list")
+--- @type Vector2D
+local Vector2D = require("__MiscLib__/vector2d")
+--- @type Logger
+local logging = require("__MiscLib__/logging")
+
 --- Since we cannot access prototype information outside game loading stage, we need extra prototype information to support any crafting machines with fluid boxes.
 local prototype_addition = {
     -- Below is fluid prototypes of the base game
@@ -74,8 +81,12 @@ local prototype_addition = {
     -- Below is prototypes of mods, add your mod fluid box prototype here
 }
 
+-- TODO:  remove this field and replace it with automatic inferred belts
+ALL_BELTS = { "transport-belt", "fast-transport-belt", "express-transport-belt" }
+
+
 --- fields that allows prototype.field == nil to exist.
-local nullable_fields = toArrayList({ "fluid_boxes" })
+local nullable_fields = ArrayList.new{ "fluid_boxes" }
 
 --- @return any an entity prototype with additional information if available
 function get_entity_prototype(name)
@@ -98,9 +109,60 @@ function get_entity_prototype(name)
     })
 end
 
---- @param crafting_item Product|Ingredient
---- @return number average amount
-function average_amount_of(crafting_item)
-    assert(crafting_item.amount or crafting_item.amount_max, serpent.line(crafting_item) .. "has no amount or amount_max field")
-    return crafting_item.amount or ((crafting_item.amount_max + crafting_item.amount_min) / 2)
+
+local PrototypeInfo = {}
+--- @param prototype LuaEntityPrototype
+--- @return Vector2D
+function PrototypeInfo.get_size(prototype)
+    return Vector2D.new(
+            math.floor(prototype.selection_box.right_bottom.x - prototype.selection_box.left_top.x + 0.5),
+            math.floor(prototype.selection_box.right_bottom.y - prototype.selection_box.left_top.y + 0.5)
+    )
 end
+
+local corresponding_underground_transport_line_table = {
+    ["pipe"] = "pipe-to-ground",
+    ["transport-belt"] = "underground-belt",
+    ["fast-transport-belt"] = "fast-underground-belt",
+    ["express-transport-belt"] = "express-underground-belt"
+}
+
+--- @param transport_name string prototype name of either a transport belt or a pipe
+--- @return LuaEntityPrototype
+function PrototypeInfo.underground_transport_prototype(transport_name)
+    if corresponding_underground_transport_line_table[transport_name] ~= nil then
+        return game.entity_prototypes[corresponding_underground_transport_line_table[transport_name]]
+    else
+        if game.entity_prototypes[transport_name].belt_speed then
+            logging.log(transport_name .. " is not one of known transport belt with underground version")
+            return game.entity_prototypes["express-underground-belt"]
+        elseif game.entity_prototypes[transport_name].fluid_capacity then
+            logging.log(transport_name .. "is not one of known pipe with underground version")
+            return game.entity_prototypes["pipe-to-ground"]
+        end
+    end
+
+    assert(false, transport_name .. " is neither a transport belt nor a pipe, and hence shall not have a corresponding underground version of it")
+end
+
+function PrototypeInfo.is_underground_transport(name)
+    if game.entity_prototypes[name].max_underground_distance then
+        return true
+    end
+    return false
+end
+
+function sprite_of(name)
+    assert(type(name) == "string")
+    if game.item_prototypes[name] then
+        return "item/" .. name
+    elseif game.fluid_prototypes[name] then
+        return "fluid/" .. name
+    elseif game.entity_prototypes[name] then
+        return "entity/" .. name
+    else
+        logging.log("failed to find sprite path for name " .. name)
+    end
+end
+
+return PrototypeInfo
